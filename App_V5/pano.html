@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Royal Ray Zone — Panoramic AI</title>
+
+  <link rel="stylesheet" href="panorama/style.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#2563eb" />
+
+  <!-- Icons -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-mark" id="rrzBrandMark"><i class="fa-solid fa-tooth"></i></div>
+        <div class="brand-text">
+          <h1>محلل البانوراما الذكي</h1>
+          <p>رفع صورة بانوراما → Mask + JSON → تقرير طبي احترافي</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost" type="button" onclick="window.location.href='dashboard.html'">
+          <i class="fa-solid fa-arrow-right"></i>
+          العودة للـ Dashboard
+        </button>
+
+        <button class="btn btn-ghost" id="toggleSettingsBtn" type="button">
+          <i class="fa-solid fa-sliders"></i>
+          إعدادات الاتصال
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- Connection Settings (collapsible) -->
+    <section class="card settings" id="settingsCard">
+      <div class="settings-row">
+        <div class="field">
+          <label for="apiUrl">رابط الـ AI Endpoint</label>
+          <div class="input-with-icon">
+            <i class="fa-solid fa-link"></i>
+            <input
+              type="text"
+              id="apiUrl"
+              placeholder="مثال: https://gpu-api.yourdomain.com"
+              inputmode="url"
+              autocomplete="off"
+            />
+          </div>
+          <div class="field-hint">
+            يفضل رابط دائم (Supervisely GPU أو Server ثابت). رابط Cloudflare/Colab مؤقت.
+          </div>
+        </div>
+        <div class="field">
+          <label for="apiMode">وضع الـ API</label>
+          <select id="apiMode" class="select">
+            <option value="auto" selected>Auto (مُوصى به)</option>
+            <option value="infer">/infer (Multipart)</option>
+            <option value="analyze">/analyze (Base64 Legacy)</option>
+          </select>
+          <div class="field-hint">Auto سيجرّب /infer ثم يعمل fallback إلى /analyze إذا لزم.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Upload -->
+    <section class="grid">
+      <!-- Upload Card -->
+      <section class="card">
+        <h2><i class="fa-solid fa-cloud-arrow-up"></i> رفع صورة البانوراما</h2>
+
+        <input id="fileInput" type="file" accept="image/*" style="display:none" />
+
+        <div id="dropZone" class="dropzone" tabindex="0" role="button" aria-label="Drop zone">
+          <div class="dz-icon"><i class="fa-solid fa-image"></i></div>
+          <div class="dz-title">اضغط لاختيار صورة أو اسحبها هنا</div>
+          <div class="dz-sub">يدعم JPG / PNG / WebP — يفضّل صورة واضحة بدقة عالية.</div>
+          <div class="dz-actions">
+            <button class="btn btn-primary" id="chooseBtn" type="button">
+              <i class="fa-solid fa-folder-open"></i> اختيار صورة
+            </button>
+            <button class="btn" id="analyzeBtn" type="button" disabled>
+              <i class="fa-solid fa-wand-magic-sparkles"></i> تحليل
+            </button>
+            <button class="btn btn-danger" id="clearBtn" type="button">
+              <i class="fa-solid fa-trash"></i> مسح
+            </button>
+          </div>
+        </div>
+
+        <div id="fileMeta" class="filemeta" style="display:none;">
+          <span class="badge"><i class="fa-solid fa-file"></i> <span id="fileName"></span></span>
+          <span class="badge"><i class="fa-solid fa-weight-hanging"></i> <span id="fileSize"></span></span>
+        </div>
+
+        <div class="field-hint" style="margin-top:10px;">
+          سيتم حفظ الصورة محليًا، ولن تُرسل للتحليل إلا عند الضغط على <b>تحليل</b>.
+        </div>
+      </section>
+
+      <!-- Preview Card -->
+      <section class="card preview" id="previewWrap" style="display:none;">
+        <h2><i class="fa-solid fa-eye"></i> معاينة</h2>
+        <img id="previewImage" alt="Preview" />
+      </section>
+    </section>
+
+    <!-- Loader -->
+    <div class="loader" id="loader" aria-live="polite">
+      <div class="spinner"></div>
+      <p id="loaderText">جاري التحليل...</p>
+    </div>
+
+    <!-- Results -->
+    <section class="results-container" id="resultsArea" style="display:none;">
+      <div class="card sectionSeg">
+        <div class="sectionTitle" style="color:#ef4444;">Segmentation</div>
+        <div class="image-wrapper" id="segGallery">
+          <img id="processedImage" src="" alt="Segmentation Result" />
+        </div>
+        <p class="hint">* صور الـ Segmentation (Mask/Overlay) تظهر هنا.</p>
+      </div>
+
+      <div class="card sectionDet">
+        <div class="sectionTitle" style="color:#22c55e;">Detection</div>
+        <div class="image-wrapper">
+          <img id="detectionImage" src="" alt="Detection Result" />
+        </div>
+        <p class="hint">* صور الـ Detection (Boxes/Labels) تظهر هنا.</p>
+      </div>
+
+      <div class="card sectionAI">
+        <div class="report-header">
+          <h3 style="margin:0; text-align:center; color:#60a5fa;"><i class="fa-solid fa-file-medical"></i> Ai Report</h3>
+          <button class="btn-small" type="button" onclick="printReport()">
+            <i class="fa-solid fa-print"></i>
+            طباعة / PDF
+          </button>
+        </div>
+        <textarea id="reportText" class="report-editor"></textarea>
+        <p class="hint">* يمكنك تعديل التقرير قبل الطباعة.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="shared/aiClient.js"></script>
+  <script src="panorama/app.js"></script>
+  <script>
+    // Register Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js').then(() => console.log('Service Worker Registered'));
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0b1220">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="manifest.json">
+    <title>Pro Occlusal Analysis (Aligner Ready)</title>
+    
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+
+    <script>
+    (function(){
+      try{
+        var qs = new URLSearchParams(location.search);
+        if (qs.get('from') === 'photo' || qs.get('slot')){
+          document.documentElement.classList.add('from-photo');
+        }
+      }catch(e){}
+    })();
+    </script>
+
+    <style>
+        * { box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        
+        body {
+            margin: 0; padding: 0;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            color: #333;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+        
+        .app-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            background: #f8fafc;
+        }
+        
+        /* Sidebar Styling */
+        .sidebar {
+            width: 320px;
+            background: #111827;
+            color: #f3f4f6;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #374151;
+            flex-shrink: 0;
+            z-index: 10;
+            transition: width 0.3s ease;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            background: #1f2937;
+            border-bottom: 1px solid #374151;
+        }
+        .sidebar-header h2 { margin: 0; font-size: 18px; color: #60a5fa; display: flex; align-items: center; gap: 8px; }
+        .sidebar-subtitle { font-size: 11px; color: #9ca3af; margin-top: 5px; }
+
+        .points-section { padding: 15px; flex: 1; overflow-y: auto; }
+        .section-title { font-size: 12px; font-weight: 700; color: #9ca3af; text-transform: uppercase; margin-bottom: 10px; display: flex; justify-content: space-between; }
+        
+        .points-list { list-style: none; padding: 0; margin: 0; }
+        .point-item {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: #d1d5db;
+        }
+        .point-item:hover { background: rgba(255,255,255,0.1); }
+        .point-item.optional { border-style: dashed; opacity: 0.85; }
+        .point-item.active { border-color: #60a5fa; background: rgba(59, 130, 246, 0.2); color: white; }
+        .point-item.done { border-left: 3px solid #10b981; }
+        .point-item.missing { border-left: 3px solid #ef4444; background: rgba(239, 68, 68, 0.1); }
+        .point-marker { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 10px; border: 2px solid rgba(255,255,255,0.8); }
+
+        /* BUTTONS STYLING */
+        .sidebar-controls {
+            padding: 20px;
+            background: #0f172a;
+            border-top: 1px solid #374151;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .btn {
+            border: none; padding: 14px; border-radius: 12px; cursor: pointer; 
+            font-weight: 600; font-size: 14px; text-align: center;
+            transition: transform 0.1s, box-shadow 0.2s; 
+            width: 100%; display: block;
+            color: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        .btn:active { transform: translateY(1px); box-shadow: none; }
+
+        .btn-undo { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1); font-size: 13px; padding: 10px; margin-bottom: 5px; }
+        .btn-blue { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+        .btn-dark { background: #1f2937; border: 1px solid #374151; color: #e5e7eb; }
+        .btn-purple { background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); }
+        .btn-orange { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .btn-red { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+
+        .btn:hover { filter: brightness(1.1); }
+
+        /* Main Content */
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; background: #cbd5e1; }
+        
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            cursor: grab;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .canvas-container:active { cursor: grabbing; }
+        
+        #face-canvas { 
+            display: block; 
+            max-width: 100%;
+            max-height: 100%;
+        }
+        
+        /* Analysis Panel */
+        .analysis-panel {
+            width: 360px;
+            background: white;
+            border-left: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.05);
+            z-index: 20;
+        }
+        
+        .panel-header { padding: 20px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+        .panel-header h3 { margin: 0; font-size: 16px; color: #1e293b; }
+
+        .metric-group { padding: 15px 20px; border-bottom: 1px solid #f1f5f9; }
+        .metric-label { font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .metric-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+        .metric-card.highlight { border-left: 3px solid #3b82f6; }
+        .metric-card.alert { border-left: 3px solid #ef4444; }
+        
+        .m-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+        .m-title { font-size: 14px; font-weight: 600; color: #334155; }
+        .m-val { font-size: 15px; font-weight: 700; color: #0f172a; }
+        .m-sub { font-size: 11px; color: #94a3b8; }
+        
+        .tag { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; color: white; }
+        .tag.green { background: #10b981; }
+        .tag.blue { background: #3b82f6; }
+        .tag.orange { background: #f59e0b; }
+        .tag.red { background: #ef4444; }
+        
+        /* Upload Overlay */
+        .upload-overlay {
+            position: absolute; inset: 0; background: rgba(241, 245, 249, 0.95);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 50;
+        }
+        .upload-box {
+            background: white; padding: 40px; border-radius: 20px; text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.1); border: 2px dashed #cbd5e1;
+        }
+
+        /* Modal */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; backdrop-filter: blur(2px); }
+        .modal-content {
+            background: white; width: 450px; margin: 10% auto; padding: 25px; border-radius: 12px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+            max-height: 80vh; overflow-y: auto;
+        }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; margin-bottom: 5px; font-size: 13px; font-weight: 600; }
+        .input-group input { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; }
+
+        /* Reference Images */
+        .ref-grid { display: grid; gap: 10px; margin-top: 10px; }
+        .ref-item { border: 1px solid #eee; padding: 10px; border-radius: 8px; }
+        .ref-title { font-weight: bold; font-size: 13px; color: #3b82f6; }
+        .ref-desc { font-size: 12px; color: #666; margin-top: 2px; }
+
+        /* Zoom Hints */
+        .canvas-controls-hint {
+            position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.6); color: white; padding: 6px 12px; border-radius: 20px;
+            font-size: 12px; pointer-events: none; z-index: 10;
+        }
+
+        /* Context Menu */
+        .context-menu {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 1000;
+            min-width: 150px;
+            display: none;
+        }
+        .context-menu-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #334155;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .context-menu-item:last-child { border-bottom: none; }
+        .context-menu-item:hover { background: #f8fafc; }
+        .context-menu-item.missing { color: #ef4444; }
+
+        /* Unified Calibration Modal Theme */
+        #calibration-modal.modal, #calib-settings-modal.modal{
+          display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%;
+          background: rgba(0,0,0,0.80); backdrop-filter: blur(5px); overflow:auto;
+        }
+        #calibration-modal .calib-unified, #calib-settings-modal .calib-unified{
+          background:#ffffff !important; margin:50px auto !important; padding:0 !important;
+          border-radius:20px !important; width:90% !important; max-width:600px !important;
+          box-shadow:0 20px 40px rgba(0,0,0,0.20) !important; overflow:hidden !important; position:relative !important;
+        }
+        .calib-unified .modal-header{
+          background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d) !important;
+          color:#ffffff !important; padding:20px 30px !important; display:flex !important;
+          align-items:center !important; justify-content:space-between !important;
+        }
+        .calib-unified .modal-header h2, .calib-unified .modal-header h3{
+          margin:0 !important; font-size:20px !important; font-weight:700 !important; color:#ffffff !important;
+        }
+        .calib-unified .close-modal, .calib-unified .close-calib{
+          color:#ffffff !important; font-size:28px !important; font-weight:700 !important;
+          cursor:pointer !important; background:transparent !important; border:0 !important;
+        }
+        .calib-unified .modal-body{ padding:25px 30px !important; }
+        .calib-unified .modal-subtitle{ margin:0 0 10px 0 !important; color:#475569 !important; font-size:13px !important; }
+        .calib-unified .calibration-options{ display:flex !important; gap:20px !important; margin:18px 0 0 0 !important; flex-wrap:wrap !important; }
+        .calib-unified .calibration-option{
+          flex:1 1 240px !important; background:#f8f9fa !important; border-radius:15px !important;
+          padding:20px !important; cursor:pointer !important; border:2px solid transparent !important;
+          transition: all 0.25s ease !important;
+        }
+        .calib-unified .calibration-option:hover{ transform: translateY(-3px) !important; box-shadow:0 15px 30px rgba(0,0,0,0.10) !important; }
+        .calib-unified .calibration-option.selected{ border-color:#b21f1f !important; background:#fff4f4 !important; }
+        .calib-unified .calibration-icon{
+          width:60px !important; height:60px !important; border-radius:50% !important;
+          background: linear-gradient(135deg, #1a2a6c, #b21f1f) !important; color:#ffffff !important;
+          display:flex !important; align-items:center !important; justify-content:center !important;
+          margin:0 auto 15px auto !important; font-size:24px !important;
+        }
+        .calib-unified h3{ margin:0 0 8px 0 !important; text-align:center !important; font-size:16px !important; color:#0f172a !important; }
+        .calib-unified p{ margin:0 !important; text-align:center !important; color:#475569 !important; font-size:13px !important; }
+        .calib-unified .calib-fields{ margin-top:14px !important; background:#ffffff !important; border-radius:12px !important; padding:14px !important; border:1px solid #e2e8f0 !important; }
+        .calib-unified .modal-footer{ display:flex !important; justify-content:flex-end !important; gap:12px !important; padding:0 30px 25px 30px !important; }
+        .calib-unified .calib-radio-row{ display:flex !important; gap:8px !important; align-items:center !important; justify-content:center !important; margin-top:12px !important; font-size:13px !important; color:#334155 !important; }
+        .calib-unified .calib-inline{ display:flex !important; gap:10px !important; align-items:center !important; }
+
+        /* =========================================
+           MOBILE RESPONSIVE & LANDSCAPE ENFORCEMENT
+           ========================================= */
+
+        /* Portrait Warning Overlay */
+        #portrait-warning {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #0f172a;
+            z-index: 99999;
+            color: white;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+        }
+        #portrait-warning svg {
+            width: 64px; height: 64px; margin-bottom: 20px;
+            animation: rotate-phone 2s infinite ease-in-out;
+        }
+        @keyframes rotate-phone {
+            0%, 10% { transform: rotate(0deg); }
+            40%, 60% { transform: rotate(90deg); }
+            90%, 100% { transform: rotate(0deg); }
+        }
+
+        /* Media Query for Mobile Portrait: Show Warning */
+        @media screen and (orientation: portrait) and (max-width: 900px) {
+            #portrait-warning { display: flex; }
+            .app-container { display: none !important; }
+        }
+
+        /* Media Query for Mobile Landscape: Optimize Layout for Side-by-Side */
+        @media screen and (max-width: 920px) and (orientation: landscape) {
+            /* Compact Sidebar */
+            .sidebar {
+                width: 200px; /* Reduced width */
+            }
+            .sidebar-header { padding: 10px; }
+            .sidebar-header h2 { font-size: 14px; }
+            .sidebar-subtitle { font-size: 10px; }
+            
+            .points-section { padding: 8px; }
+            .point-item { 
+                padding: 6px 8px; 
+                font-size: 11px; 
+                margin-bottom: 4px;
+            }
+            .point-marker { width: 8px; height: 8px; margin-right: 6px; }
+            
+            .sidebar-controls { padding: 10px; gap: 6px; }
+            .btn { padding: 8px; font-size: 11px; }
+            
+            /* Compact Analysis Panel if visible */
+            .analysis-panel { width: 220px; }
+            
+            .upload-box { padding: 20px; }
+            .upload-box h2 { font-size: 18px; }
+            
+            /* Hide non-critical UI elements for space */
+            .canvas-controls-hint { display: none; }
+        }
+        
+        /* Small phones landscape */
+        @media screen and (max-height: 500px) {
+            .sidebar-header { display: none; }
+            .points-list { padding-bottom: 20px; }
+        }
+
+    
+        /* ===== Mobile rotate & landscape layout (PWA UX patch) ===== */
+        .rotate-overlay{
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.88);
+            color: #fff;
+            z-index: 999999;
+            padding: 24px;
+            text-align: center;
+        }
+        .rotate-overlay .rotate-card{
+            max-width: 420px;
+            width: 100%;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 18px;
+            padding: 22px 18px;
+            backdrop-filter: blur(8px);
+        }
+        .rotate-overlay .rotate-icon{
+            font-size: 44px;
+            margin-bottom: 10px;
+        }
+        .rotate-overlay h2{
+            margin: 0 0 8px 0;
+            font-size: 20px;
+            line-height: 1.25;
+        }
+        .rotate-overlay p{
+            margin: 0;
+            opacity: 0.9;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* Force rotate on phones when portrait */
+        @media (max-width: 900px) and (orientation: portrait){
+            .rotate-overlay{ display: flex; }
+            body{ overflow: hidden; }
+        }
+
+        /* Improve landscape on mobile: keep sidebar next to content + allow scroll */
+@media (max-width: 900px) and (orientation: landscape){
+    html, body{
+        height: auto !important;
+        min-height: 100% !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+    }
+    body{ -webkit-overflow-scrolling: touch; }
+
+    /* Use grid so sidebar stays left and (canvas + report) become vertically scrollable */
+    .app-container{
+        display: grid !important;
+        grid-template-columns: 240px 1fr;
+        grid-template-rows: auto auto;
+        height: auto !important;
+        min-height: 100vh !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .sidebar{
+        grid-column: 1;
+        grid-row: 1 / span 2;
+        width: 240px !important;
+        position: sticky !important;
+        top: 0;
+        height: 100vh !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .main-content{
+        grid-column: 2;
+        grid-row: 1;
+        height: auto !important;
+        overflow: visible !important;
+        min-height: 60vh;
+    }
+
+    .canvas-container{
+        overflow: auto !important;
+        -webkit-overflow-scrolling: touch;
+        min-height: 50vh;
+    }
+
+    .analysis-panel, .analysis-section, .right-panel, .results-panel{
+        grid-column: 2;
+        grid-row: 2;
+        width: auto !important;
+        max-width: none !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        border-left: none !important;
+        border-top: 1px solid rgba(0,0,0,0.10) !important;
+    }
+
+    /* Sidebar buttons: 2-column grid */
+    .sidebar-controls{
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        align-items: stretch;
+    }
+    .sidebar-controls .btn,
+    .sidebar-controls button{
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Hide sub-headings to save space */
+    .sidebar-subtitle,
+    .subheading,
+    .section-subtitle{
+        display: none !important;
+    }
+}
+
+.sidebar{
+                width: 280px !important;
+                height: 100vh !important;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .main-content, .content, .main{
+                height: 100vh;
+                overflow: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* Sidebar buttons as 2-column grid to avoid long scrolling */
+            .sidebar-controls{
+                display: grid !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
+                align-items: stretch;
+            }
+            .sidebar-controls .btn,
+            .sidebar-controls button{
+                width: 100%;
+                justify-content: center;
+            }
+
+            /* Hide sub-headings to save space */
+            .sidebar-subtitle,
+            .subheading,
+            .section-subtitle{
+                display: none !important;
+            }
+        }
+
+    
+
+/* === RRZ_SCROLL_PAN_FIX_V1.10 === */
+/* UI-only patch: enables scroll-pan on mobile landscape + PC, avoids cropped UI, enlarges landmarks list. */
+html, body{
+  height: auto !important;
+  min-height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+body{ -webkit-overflow-scrolling: touch; }
+
+/* Keep portrait rotate overlays effective */
+@media (max-width: 900px) and (orientation: portrait){
+  html, body{ overflow: hidden !important; }
+}
+
+.app-container{
+  height: auto !important;
+  min-height: 100vh !important;
+}
+
+/* Sidebar: make list area large and keep buttons reachable */
+.sidebar{
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 100vh !important;
+}
+.points-section{
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: auto !important;
+}
+
+/* Works for workflows (select list) + (ul list) */
+.points-wheel,
+.points-list{
+  flex: 1 1 auto !important;
+  min-height: 300px !important;
+  height: auto !important;
+  overflow: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Main layout: remove hard 100vh clipping so Notes/Report can be reached by scroll */
+.main-content,
+.analysis-container,
+.content,
+.main{
+  height: auto !important;
+  min-height: 100vh !important;
+  overflow: visible !important;
+}
+
+/* Right panels (workflow 8/9 + some others) */
+.analysis-panel,
+.results-panel,
+.right-panel,
+.analysis-section,
+.user-notes-panel{
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  position: static !important;
+}
+
+/* Mobile landscape: tighten buttons so they aren't cropped */
+@media (max-width: 900px) and (orientation: landscape){
+  .sidebar-controls{
+    padding: 12px !important;
+    gap: 10px !important;
+  }
+  .sidebar-controls .btn,
+  .sidebar-controls button{
+    padding: 12px !important;
+    font-size: 12px !important;
+    border-radius: 10px !important;
+  }
+  .points-wheel,
+  .points-list{
+    min-height: 220px !important;
+  }
+}
+
+/* Desktop/PC: always allow scroll (even if inner sections had fixed heights) */
+@media (min-width: 901px){
+  .main-content{ overflow: visible !important; }
+}
+</style>
+<style id="rrz-desktop-scroll-fix">
+/* === RRZ Desktop/Laptop Scroll-Pan Fix (UI only) ===
+   Goal: enable vertical scrolling on PC/Laptop where previous rules forced overflow:hidden.
+   Does NOT touch any JS logic, functions, or calculations.
+*/
+@media (min-width: 1025px){
+  html, body{
+    height: auto !important;
+    min-height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: auto !important;
+  }
+  /* Let the page grow so the browser scrollbar appears */
+  .app-container,
+  .analysis-container,
+  .main-content,
+  .content-area,
+  .analysis-panel,
+  .report-section,
+  .notes-section{
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  /* If a workflow uses a full-height flex shell, allow it to expand */
+  .analysis-container{ align-items: stretch !important; }
+}
+
+/* Large tablets / small laptops */
+@media (min-width: 768px) and (max-width: 1024px){
+  html, body{
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- Portrait Warning Overlay -->
+<div id="portrait-warning">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+        <path d="M12 18h.01"></path>
+    </svg>
+    <h2>Please Rotate Device</h2>
+    <p style="color:#94a3b8; font-size:14px; max-width:300px;">
+        For the best experience, please use landscape orientation.
+    </p>
+</div>
+
+<div class="app-container">
+    
+    <!-- LEFT SIDEBAR: Controls & Landmarks -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2><i>🦷</i> Occlusal AI</h2>
+            <div class="sidebar-subtitle">Advanced Arch Form Analysis</div>
+        </div>
+
+        <div class="points-section">
+            <div class="section-title">
+                <span>Landmarks (17 required)</span>
+                <span id="points-counter">0/17</span>
+            </div>
+            <ul class="points-list" id="points-list">
+                <!-- Generated by JS -->
+            </ul>
+        </div>
+
+        <div class="sidebar-controls">
+            <button class="btn btn-undo" onclick="undoPoint()">Undo Point</button>
+            <button class="btn btn-blue" onclick="analyze()">Complete Analysis</button>
+            <button class="btn btn-dark" onclick="openCalibrationSettings(true)">Calibration</button>
+            <button class="btn btn-purple" onclick="openRefGuide()">Reference</button>
+            <button class="btn btn-red" onclick="exportPDF()">Export PDF</button>
+            
+            <div style="text-align:center; margin-top:5px;">
+                <button onclick="document.getElementById('file-input').click()" style="background:none; border:none; color:#6b7280; font-size:11px; cursor:pointer; text-decoration:underline;">Change Image</button>
+                <span style="color:#4b5563; margin:0 5px;">|</span>
+                <button onclick="resetAll()" style="background:none; border:none; color:#ef4444; font-size:11px; cursor:pointer; text-decoration:underline;">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CENTER: Canvas Area -->
+    <div class="main-content">
+        <div class="canvas-container" id="canvas-wrapper">
+            <canvas id="face-canvas"></canvas>
+            
+            <div class="upload-overlay" id="upload-overlay">
+                <div class="upload-box">
+                    <h2 style="margin-top:0;">Upload Occlusal Photo</h2>
+                    <p style="color:#64748b; font-size:14px; margin-bottom:20px;">Support for JPG, PNG.</p>
+                    <button class="btn btn-blue" style="width:auto; display:inline-block; padding:12px 30px;" onclick="document.getElementById('file-input').click()">Select Image</button>
+                </div>
+            </div>
+            
+            <div class="canvas-controls-hint">
+                Wheel to Zoom • Drag to Pan • Click to Place
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT: Analysis Results -->
+    <div class="analysis-panel">
+        <div class="panel-header">
+            <h3>Analysis Report</h3>
+            <div style="font-size:12px; color:#64748b;" id="calib-indicator">Uncalibrated (px)</div>
+        </div>
+
+        <div id="results-container" style="display:none;">
+            <!-- 1. Arch Form & Shape -->
+            <div class="metric-group">
+                <div class="metric-label">Arch Form & Shape</div>
+                <div class="metric-card highlight">
+                    <div class="m-row">
+                        <div class="m-title">Arch Form Type</div>
+                        <div class="tag blue" id="arch-form-tag">--</div>
+                    </div>
+                    <div class="m-sub" id="arch-ratio-val">Width/Depth Ratio: --</div>
+                    <div class="m-sub" style="margin-top:4px; font-style:italic;" id="arch-rec">Shape: --</div>
+                </div>
+                <div class="metric-card" id="deformity-card">
+                    <div class="m-row">
+                        <div class="m-title">Arch Deformity</div>
+                        <div class="tag green" id="deformity-tag">--</div>
+                    </div>
+                    <div class="m-sub" id="deformity-desc">Based on symmetry analysis</div>
+                </div>
+            </div>
+
+            <!-- 2. Width Measurements -->
+            <div class="metric-group">
+                <div class="metric-label">Width Measurements</div>
+                <div class="metric-card">
+                    <div class="m-row">
+                        <div class="m-title">Intercanine Width</div>
+                        <div class="m-val" id="icw-val">--</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="m-row">
+                        <div class="m-title">Intermolar Width (Fossa)</div>
+                        <div class="m-val" id="imw-val">--</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="m-row">
+                        <div class="m-title">Intermolar Width (Cusp)</div>
+                        <div class="m-val" id="imw-cusp-val">--</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="m-row">
+                        <div class="m-title">Premolar Width</div>
+                        <div class="m-val" id="pmw-val">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Midline Measurements -->
+            <div class="metric-group">
+                <div class="metric-label">Midline Measurements</div>
+                <div class="metric-card">
+                    <div class="m-row">
+                        <div class="m-title">Dental to Posterior</div>
+                        <div class="m-val" id="midline-length-val">--</div>
+                    </div>
+                </div>
+                <div class="metric-card alert" id="midline-card">
+                    <div class="m-row">
+                        <div class="m-title">Midline Deviation</div>
+                        <div class="m-val" id="midline-val">--</div>
+                    </div>
+                    <div class="m-sub" id="midline-dir">Direction: --</div>
+                </div>
+                <div class="metric-card">
+                    <div class="m-row">
+                        <div class="m-title">Arch Symmetry Index</div>
+                        <div class="m-val" id="sym-val">--%</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 4. Missing Teeth -->
+            <div class="metric-group" id="missing-teeth-section" style="display:none;">
+                <div class="metric-label">Missing Teeth Analysis</div>
+                <div class="metric-card alert">
+                    <div class="m-row">
+                        <div class="m-title">Missing Teeth Count</div>
+                        <div class="m-val" id="missing-count">0</div>
+                    </div>
+                    <div class="m-sub" id="missing-list">None</div>
+                </div>
+            </div>
+
+            <!-- 5. Recommendations -->
+            <div class="metric-group">
+                <div class="metric-label">Clinical Recommendations</div>
+                <div class="metric-card">
+                    <div class="m-sub" id="recommendations" style="line-height:1.4;">
+                        Complete analysis to see recommendations.
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        
+        <div id="empty-state" style="padding:40px; text-align:center; color:#94a3b8;">
+            Place all landmarks to see analysis results.
+        </div>
+    </div>
+</div>
+
+<!-- Inputs -->
+<input type="file" id="file-input" hidden accept="image/*">
+
+<!-- Context Menu -->
+<div class="context-menu" id="context-menu">
+    <div class="context-menu-item" onclick="markAsMissing()">
+        <span style="color:#ef4444;">✕</span> Mark as Missing Tooth
+    </div>
+    <div class="context-menu-item" onclick="editPoint()">
+        <span>✏️</span> Edit This Point
+    </div>
+    <div class="context-menu-item" onclick="deletePoint()">
+        <span>🗑️</span> Delete This Point
+    </div>
+</div>
+
+<!-- Calibration Settings Modal -->
+<div class="modal" id="calib-settings-modal" style="display:none;">
+  <div class="modal-content calib-unified" role="dialog">
+    <div class="modal-header">
+      <h2 id="calibSettingsTitle">Calibration Settings</h2>
+      <button class="close-modal" type="button" onclick="closeCalibrationSettings()">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <p class="modal-subtitle" id="calib-settings-hint">Select a calibration method.</p>
+
+      <div class="calibration-options">
+        <div class="calibration-option selected" id="calib-opt-manual" onclick="document.querySelector('input[name=calib-method][value=manual]').checked=true; updateCalibSettingsUI();">
+          <div class="calibration-icon">📏</div>
+          <h3>Manual (mm)</h3>
+          <p>Use two anatomical points.</p>
+          <div class="calib-radio-row">
+            <input type="radio" name="calib-method" value="manual" checked onchange="updateCalibSettingsUI()">
+            <span>Select Manual</span>
+          </div>
+        </div>
+
+        <div class="calibration-option" id="calib-opt-pixel" onclick="document.querySelector('input[name=calib-method][value=pixel]').checked=true; updateCalibSettingsUI();">
+          <div class="calibration-icon">🔢</div>
+          <h3>Pixel (px/mm)</h3>
+          <p>Enter the scale directly.</p>
+          <div class="calib-radio-row">
+            <input type="radio" name="calib-method" value="pixel" onchange="updateCalibSettingsUI()">
+            <span>Select Pixel</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="pixel-calib-fields" class="calib-fields" style="display:none;">
+        <div class="input-group">
+          <label>Scale (px per mm)</label>
+          <div class="calib-inline">
+            <input type="number" id="px-per-mm" placeholder="e.g., 6.25" step="0.0001">
+            <button class="btn btn-dark" onclick="invertPxMm()" type="button">Invert</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-dark" type="button" onclick="closeCalibrationSettings()">Close</button>
+      <button class="btn btn-blue" type="button" onclick="applyCalibrationSettings()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual Calibration Modal -->
+<div class="modal" id="calib-modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0;">Calibration</h3>
+        <p style="font-size:13px; color:#64748b;">Enter the real-world distance.</p>
+        
+        <div class="input-group">
+            <label>Measured Distance (mm)</label>
+            <input type="number" id="known-mm" placeholder="e.g., 35">
+        </div>
+        <div class="input-group">
+            <label>Reference Points used:</label>
+            <select id="calib-ref-type" style="width:100%; padding:8px;">
+                <option value="icw">Intercanine Width (Canines)</option>
+                <option value="imw">Intermolar Width (First Molars Fossa)</option>
+                <option value="imw-cusp">Intermolar Width (Mesio-buccal Cusps)</option>
+                <option value="midline">Midline Length (Dental to Posterior)</option>
+            </select>
+        </div>
+        
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <button class="btn btn-undo" style="width:auto; color:#333;" onclick="closeModal('calib-modal')">Cancel</button>
+            <button class="btn btn-blue" style="width:auto; padding:10px 20px;" onclick="applyCalibration()">Apply</button>
+        </div>
+    </div>
+</div>
+
+<!-- Reference Guide Modal -->
+<div class="modal" id="ref-modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0; color:#7e22ce;">Landmark Guide</h3>
+        <div class="ref-grid">
+            <div class="ref-item"><div class="ref-title">1. Midline Posterior</div></div>
+            <div class="ref-item"><div class="ref-title">2. Midline Anterior</div></div>
+            <div class="ref-item"><div class="ref-title">3. Dental Midline</div></div>
+            <div class="ref-item"><div class="ref-title">4-6. Right Incisors/Canine</div></div>
+            <div class="ref-item"><div class="ref-title">7-10. Right Premolars/Molar</div></div>
+            <div class="ref-item"><div class="ref-title">11-13. Left Incisors/Canine</div></div>
+            <div class="ref-item"><div class="ref-title">14-17. Left Premolars/Molar</div></div>
+        </div>
+        <button class="btn btn-undo" style="width:100%; margin-top:20px; color:#333;" onclick="closeModal('ref-modal')">Close Guide</button>
+    </div>
+</div>
+
+<script>
+const LANDMARKS = [
+    { id: 'mid_post', name: '1. Midline Posterior (Raphe)', color: '#94a3b8' },
+    { id: 'mid_ant',  name: '2. Midline Anterior (Papilla)', color: '#94a3b8' },
+    { id: 'mid_dent', name: '3. Dental Midline', color: '#ef4444' },
+    { id: 'r_ci', name: '4. R Central Incisor', color: '#3b82f6' },
+    { id: 'r_li', name: '5. R Lateral Incisor', color: '#3b82f6' },
+    { id: 'r_c',  name: '6. R Canine', color: '#3b82f6' },
+    { id: 'r_p1', name: '7. R 1st Premolar', color: '#f59e0b' },
+    { id: 'r_p2', name: '8. R 2nd Premolar', color: '#f59e0b' },
+    { id: 'r_m1_fossa', name: '9. R 1st Molar Fossa', color: '#10b981' },
+    { id: 'r_m1_cusp', name: '10. R Molar Cusp (MB)', color: '#8b5cf6' },
+    { id: 'l_ci', name: '11. L Central Incisor', color: '#ef4444' },
+    { id: 'l_li', name: '12. L Lateral Incisor', color: '#ef4444' },
+    { id: 'l_c',  name: '13. L Canine', color: '#ef4444' },
+    { id: 'l_p1', name: '14. L 1st Premolar', color: '#f59e0b' },
+    { id: 'l_p2', name: '15. L 2nd Premolar', color: '#f59e0b' },
+    { id: 'l_m1_fossa', name: '16. L 1st Molar Fossa', color: '#10b981' },
+    { id: 'l_m1_cusp', name: '17. L Molar Cusp (MB)', color: '#8b5cf6' },
+    { id: 'r_m2_fossa', name: '18. R 2nd Molar Fossa (Optional)', color: '#10b981', optional: true },
+    { id: 'l_m2_fossa', name: '19. L 2nd Molar Fossa (Optional)', color: '#10b981', optional: true }
+];
+
+const REQUIRED_COUNT = LANDMARKS.filter(l => !l.optional).length;
+
+const view = { scale: 1, offsetX: 0, offsetY: 0, isDragging: false, lastX: 0, lastY: 0, startX: 0, startY: 0 };
+const state = {
+    img: null, points: [], currIdx: 0, ppm: 0, missingTeeth: new Array(LANDMARKS.length).fill(false),
+    draggingPoint: null, canvas: null, ctx: null, archPoints: [], canvasWidth: 0, canvasHeight: 0,
+    showMeasurements: false, measurements: []
+};
+
+let contextMenuPoint = null;
+
+function init() {
+    state.points = new Array(LANDMARKS.length).fill(null);
+    state.currIdx = 0;
+    state.ppm = 0;
+    view.scale = 1; view.offsetX = 0; view.offsetY = 0;
+    state.missingTeeth = new Array(LANDMARKS.length).fill(false);
+    state.draggingPoint = null; state.measurements = [];
+    
+    state.canvas = document.getElementById('face-canvas');
+    state.ctx = state.canvas.getContext('2d');
+    
+    const container = document.getElementById('canvas-wrapper');
+    state.canvasWidth = container.clientWidth;
+    state.canvasHeight = container.clientHeight;
+    state.canvas.width = state.canvasWidth;
+    state.canvas.height = state.canvasHeight;
+    
+    document.getElementById('calib-indicator').textContent = "Uncalibrated (px)";
+    document.getElementById('results-container').style.display = 'none';
+    document.getElementById('empty-state').style.display = 'block';
+    
+    draw();
+    updateSidebar();
+}
+
+function setupEvents() {
+    document.getElementById('file-input').addEventListener('change', handleFile);
+    const c = state.canvas;
+    const wrapper = document.getElementById('canvas-wrapper');
+    
+    new ResizeObserver(() => {
+        const container = document.getElementById('canvas-wrapper');
+        state.canvasWidth = container.clientWidth;
+        state.canvasHeight = container.clientHeight;
+        state.canvas.width = state.canvasWidth;
+        state.canvas.height = state.canvasHeight;
+        if(state.img) fitImageToScreen();
+    }).observe(wrapper);
+
+    c.addEventListener('wheel', handleWheel, { passive: false });
+    c.addEventListener('mousedown', handleMouseDown);
+    c.addEventListener('contextmenu', handleContextMenu);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    
+    document.addEventListener('click', (e) => {
+        const menu = document.getElementById('context-menu');
+        if (menu && !menu.contains(e.target)) hideContextMenu();
+    });
+}
+
+function handleFile(e) {
+    if(!e.target.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+        const img = new Image();
+        img.onload = () => {
+            state.img = img;
+            init();
+            fitImageToScreen();
+            document.getElementById('upload-overlay').style.display = 'none';
+        };
+        img.src = evt.target.result;
+    };
+    reader.readAsDataURL(e.target.files[0]);
+}
+
+async function rrzTryLoadFromIndexedDB(slot){
+    try{
+        if(!slot) return null;
+        const DB_NAME = "rrz_clinical_photos_db";
+        const DB_STORE = "images";
+        const DB_VER = 1;
+        const open = ()=> new Promise((resolve,reject)=>{
+            const req = indexedDB.open(DB_NAME, DB_VER);
+            req.onsuccess = ()=> resolve(req.result);
+            req.onerror = ()=> reject(req.error || new Error("IDB open failed"));
+            req.onupgradeneeded = ()=> { /* store is created by photo.html */ };
+        });
+        const db = await open();
+        return await new Promise((resolve,reject)=>{
+            const tx = db.transaction(DB_STORE, "readonly");
+            const req = tx.objectStore(DB_STORE).get(slot);
+            req.onsuccess = ()=> {
+                const rec = req.result;
+                if(rec && rec.blob){
+                    try{
+                        const url = URL.createObjectURL(rec.blob);
+                        resolve(url);
+                    }catch(e){ resolve(null); }
+                }else{
+                    resolve(null);
+                }
+            };
+            req.onerror = ()=> resolve(null);
+        });
+    }catch(e){
+        return null;
+    }
+}
+
+function rrzAutoLoadFromPhoto(){
+    (async ()=>{
+        try{
+            const qs = new URLSearchParams(location.search);
+            const from = qs.get('from') || '';
+            const slot = qs.get('slot') || '';
+            const autocal = qs.get('autocal') || '';
+            if(!(from === 'photo' || slot)) return;
+
+            const keys = [`rrz_${slot}_image`, `rrz_${slot}_image_dataurl`, 'rrz_uploaded_image', 'uploadedImageDataUrl', 'selectedImageDataUrl'];
+            let src = null;
+
+            // 1) sessionStorage dataURL (fast path)
+            for(const k of keys){
+                try{
+                    const v = sessionStorage.getItem(k);
+                    if(v && typeof v === 'string' && (v.startsWith('data:image') || v.startsWith('blob:'))){ src = v; break; }
+                }catch(e){}
+            }
+
+            // 2) IndexedDB fallback (avoids sessionStorage quota issues)
+            if(!src && typeof indexedDB !== 'undefined' && slot){
+                src = await rrzTryLoadFromIndexedDB(slot);
+            }
+
+            if(src){
+                const img = new Image();
+                img.onload = () => {
+                    try{
+                        state.img = img;
+                        init();
+                        fitImageToScreen();
+                        const ov = document.getElementById('upload-overlay');
+                        if(ov) ov.style.display = 'none';
+                        if(autocal==='1'){
+                            setTimeout(()=>{ try{ openCalibrationSettings(true); }catch(e){} }, 120);
+                        }
+                    }catch(e){}
+                };
+                img.src = src;
+            }
+        }catch(e){}
+    })();
+}    
+
+function fitImageToScreen() {
+    if(!state.img) return;
+    const imgWidth = state.img.width;
+    const imgHeight = state.img.height;
+    const scale = Math.min(state.canvasWidth / imgWidth, state.canvasHeight / imgHeight) * 0.9;
+    view.scale = scale;
+    view.offsetX = (state.canvasWidth - imgWidth * scale) / 2;
+    view.offsetY = (state.canvasHeight - imgHeight * scale) / 2;
+    draw();
+}
+
+function getImageCoordinates(clientX, clientY) {
+    const rect = state.canvas.getBoundingClientRect();
+    return {
+        x: (clientX - rect.left - view.offsetX) / view.scale,
+        y: (clientY - rect.top - view.offsetY) / view.scale
+    };
+}
+
+function handleWheel(e) {
+    if(!state.img) return;
+    e.preventDefault();
+    const zoomIntensity = 0.1;
+    const delta = e.deltaY > 0 ? -1 : 1;
+    const newScale = view.scale * (1 + delta * zoomIntensity);
+    if (newScale < 0.1 || newScale > 10) return;
+
+    const rect = state.canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const imgX = (mouseX - view.offsetX) / view.scale;
+    const imgY = (mouseY - view.offsetY) / view.scale;
+
+    view.scale = newScale;
+    view.offsetX = mouseX - imgX * view.scale;
+    view.offsetY = mouseY - imgY * view.scale;
+    draw();
+}
+
+function handleMouseDown(e) {
+    if(!state.img) return;
+    if(e.button === 2) return;
+    
+    const coords = getImageCoordinates(e.clientX, e.clientY);
+    let pointClicked = -1;
+    let minDist = 15 / view.scale;
+    
+    for(let i = 0; i < state.points.length; i++) {
+        if(state.points[i] && !state.missingTeeth[i]) {
+            const dist = Math.hypot(state.points[i].x - coords.x, state.points[i].y - coords.y);
+            if(dist < minDist) { minDist = dist; pointClicked = i; }
+        }
+    }
+    
+    if(pointClicked !== -1) {
+        state.draggingPoint = pointClicked;
+        document.getElementById('canvas-wrapper').style.cursor = 'move';
+        e.preventDefault();
+        return;
+    }
+    
+    view.isDragging = false;
+    view.startX = e.clientX; view.startY = e.clientY;
+    view.lastX = e.clientX; view.lastY = e.clientY;
+    e.preventDefault();
+}
+
+function handleMouseMove(e) {
+    if(!state.img) return;
+    if(state.draggingPoint !== null) {
+        const coords = getImageCoordinates(e.clientX, e.clientY);
+        state.points[state.draggingPoint] = { x: coords.x, y: coords.y };
+        draw();
+        return;
+    }
+    if(e.buttons === 1 && (view.isDragging || Math.abs(e.clientX - view.startX) > 5)) {
+        view.isDragging = true;
+        view.offsetX += e.clientX - view.lastX;
+        view.offsetY += e.clientY - view.lastY;
+        view.lastX = e.clientX; view.lastY = e.clientY;
+        draw();
+    }
+}
+
+function handleMouseUp(e) {
+    if(!state.img) return;
+    if(state.draggingPoint !== null) {
+        state.draggingPoint = null;
+        document.getElementById('canvas-wrapper').style.cursor = 'grab';
+        if(state.currIdx >= 7) analyze();
+        return;
+    }
+    if(e.button === 0 && !view.isDragging) {
+        const coords = getImageCoordinates(e.clientX, e.clientY);
+        if(coords.x >= 0 && coords.x <= state.img.width && coords.y >= 0 && coords.y <= state.img.height) {
+            if(state.currIdx < LANDMARKS.length) {
+                state.points[state.currIdx] = {x: coords.x, y: coords.y};
+                state.currIdx++;
+                draw();
+                updateSidebar();
+            }
+        }
+    }
+    view.isDragging = false;
+}
+
+function handleContextMenu(e) {
+    e.preventDefault();
+    if(!state.img) return;
+    const coords = getImageCoordinates(e.clientX, e.clientY);
+    let closestIdx = -1;
+    let minDist = 20 / view.scale;
+    state.points.forEach((p, idx) => {
+        if(p && !state.missingTeeth[idx]) {
+            const dist = Math.hypot(p.x - coords.x, p.y - coords.y);
+            if(dist < minDist) { minDist = dist; closestIdx = idx; }
+        }
+    });
+    if(closestIdx !== -1) {
+        contextMenuPoint = closestIdx;
+        const menu = document.getElementById('context-menu');
+        menu.style.display = 'block';
+        menu.style.left = e.clientX + 'px';
+        menu.style.top = e.clientY + 'px';
+    }
+}
+
+function hideContextMenu() { document.getElementById('context-menu').style.display = 'none'; contextMenuPoint = null; }
+function markAsMissing() { if(contextMenuPoint !== null) { state.missingTeeth[contextMenuPoint] = true; hideContextMenu(); draw(); updateSidebar(); if(state.currIdx >= 7) analyze(); } }
+function editPoint() { if(contextMenuPoint !== null) { state.draggingPoint = contextMenuPoint; hideContextMenu(); document.getElementById('canvas-wrapper').style.cursor = 'move'; } }
+function deletePoint() { if(contextMenuPoint !== null) { state.points[contextMenuPoint] = null; state.missingTeeth[contextMenuPoint] = false; if(contextMenuPoint === state.currIdx - 1) state.currIdx--; hideContextMenu(); draw(); updateSidebar(); if(state.currIdx >= 7) analyze(); } }
+
+function draw() {
+    const ctx = state.ctx;
+    const w = state.canvas.width;
+    const h = state.canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#cbd5e1'; ctx.fillRect(0, 0, w, h);
+    ctx.save();
+    ctx.translate(view.offsetX, view.offsetY);
+    ctx.scale(view.scale, view.scale);
+    if(state.img) ctx.drawImage(state.img, 0, 0);
+
+    if(state.archPoints.length > 2) drawArchCurve();
+    if(state.showMeasurements && state.measurements.length > 0) drawMeasurementLines();
+
+    state.points.forEach((p, i) => {
+        if(!p) return;
+        if(state.missingTeeth[i]) {
+            const size = 10 / view.scale;
+            ctx.beginPath(); ctx.moveTo(p.x - size, p.y - size); ctx.lineTo(p.x + size, p.y + size);
+            ctx.moveTo(p.x + size, p.y - size); ctx.lineTo(p.x - size, p.y + size);
+            ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3 / view.scale; ctx.stroke();
+        } else {
+            const isDragging = i === state.draggingPoint;
+            const pointSize = isDragging ? 12 / view.scale : 10 / view.scale;
+            ctx.beginPath(); ctx.arc(p.x, p.y, pointSize + 2, 0, Math.PI * 2);
+            ctx.fillStyle = isDragging ? 'rgba(59, 130, 246, 0.5)' : 'rgba(0, 0, 0, 0.3)'; ctx.fill();
+            ctx.beginPath(); ctx.arc(p.x, p.y, pointSize, 0, Math.PI * 2);
+            ctx.fillStyle = LANDMARKS[i].color; ctx.fill();
+            ctx.beginPath(); ctx.arc(p.x, p.y, pointSize - 2, 0, Math.PI * 2);
+            ctx.fillStyle = 'white'; ctx.fill();
+            ctx.fillStyle = 'black'; ctx.font = `bold ${12 / view.scale}px Arial`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(i + 1, p.x, p.y);
+        }
+    });
+    ctx.restore();
+}
+
+function drawArchCurve() {
+    const ctx = state.ctx;
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(state.archPoints[0].x, state.archPoints[0].y);
+    for(let i = 0; i < state.archPoints.length - 1; i++) {
+        const p0 = i > 0 ? state.archPoints[i-1] : state.archPoints[i];
+        const p1 = state.archPoints[i];
+        const p2 = state.archPoints[i+1];
+        const p3 = i < state.archPoints.length - 2 ? state.archPoints[i+2] : p2;
+        const tension = 0.5;
+        const t0x = (p2.x - p0.x) * tension; const t0y = (p2.y - p0.y) * tension;
+        const t1x = (p3.x - p1.x) * tension; const t1y = (p3.y - p1.y) * tension;
+        ctx.bezierCurveTo(p1.x + t0x/3, p1.y + t0y/3, p2.x - t1x/3, p2.y - t1y/3, p2.x, p2.y);
+    }
+    ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)'; ctx.lineWidth = 3 / view.scale; ctx.stroke();
+    ctx.restore();
+}
+
+function drawMeasurementLines() {
+    const ctx = state.ctx;
+    ctx.save();
+    state.measurements.forEach(m => {
+        ctx.beginPath(); ctx.moveTo(m.p1.x, m.p1.y); ctx.lineTo(m.p2.x, m.p2.y);
+        ctx.strokeStyle = m.color; ctx.lineWidth = 2 / view.scale; ctx.setLineDash([5 / view.scale, 3 / view.scale]); ctx.stroke(); ctx.setLineDash([]);
+        const midX = (m.p1.x + m.p2.x) / 2; const midY = (m.p1.y + m.p2.y) / 2;
+        const text = `${m.label}: ${m.value}${m.unit}`;
+        ctx.font = `bold ${12 / view.scale}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const w = ctx.measureText(text).width;
+        ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(midX - w/2 - 2, midY - 10/view.scale, w+4, 20/view.scale);
+        ctx.fillStyle = 'white'; ctx.fillText(text, midX, midY);
+    });
+    ctx.restore();
+}
+
+function updateSidebar() {
+    const list = document.getElementById('points-list');
+    list.innerHTML = '';
+    const placed = state.points.reduce((acc, pt, idx) => { if(pt && !LANDMARKS[idx].optional) acc++; return acc; }, 0);
+    document.getElementById('points-counter').textContent = `${placed}/${REQUIRED_COUNT}`;
+    LANDMARKS.forEach((l, i) => {
+        const li = document.createElement('li');
+        li.className = `point-item ${l.optional ? 'optional' : ''} ${i === state.currIdx ? 'active' : ''} ${state.points[i] ? 'done' : ''} ${state.missingTeeth[i] ? 'missing' : ''}`;
+        li.onclick = () => { if(state.points[i]) { state.draggingPoint = i; document.getElementById('canvas-wrapper').style.cursor = 'move'; updateSidebar(); } };
+        li.innerHTML = `<span><span class="point-marker" style="background:${l.color}"></span>${l.name}</span>${state.points[i] ? (state.missingTeeth[i] ? '✕' : '✓') : ''}`;
+        list.appendChild(li);
+    });
+}
+
+function analyze() {
+    if(state.currIdx < 7) { alert("Place more points."); return; }
+    const p = state.points;
+    const ppm = state.ppm || 1;
+    const unit = state.ppm ? 'mm' : 'px';
+    const dist = (p1, p2) => (p1 && p2) ? Math.hypot(p1.x - p2.x, p1.y - p2.y) / ppm : 0;
+    
+    state.measurements = [];
+    let midlineLength = dist(p[2], p[0]);
+    if(midlineLength) state.measurements.push({ p1: p[2], p2: p[0], color: '#ef4444', label: 'Midline', value: midlineLength.toFixed(1), unit });
+
+    let icw = dist(p[5], p[12]);
+    if(icw) state.measurements.push({ p1: p[5], p2: p[12], color: '#3b82f6', label: 'ICW', value: icw.toFixed(1), unit });
+
+    let imw = dist(p[8], p[15]);
+    if(imw) state.measurements.push({ p1: p[8], p2: p[15], color: '#10b981', label: 'IMW Fossa', value: imw.toFixed(1), unit });
+
+    let imwCusp = dist(p[9], p[16]);
+    let pmw = dist(p[6], p[13]);
+    
+    let midlineDev = 0; let midlineDir = "Centered";
+    if(p[0] && p[1] && p[2]) {
+        const vx = p[1].x - p[0].x; const vy = p[1].y - p[0].y;
+        const mag = Math.hypot(vx, vy);
+        const cross = (vx * (p[2].y - p[0].y) - vy * (p[2].x - p[0].x));
+        midlineDev = Math.abs(cross / mag / ppm);
+        midlineDir = cross > 0 ? "Right" : "Left";
+    }
+
+    let archForm = "Ovoid";
+    let archRatio = (imw && icw) ? imw/icw : 0;
+    if(archRatio > 1.4) archForm = "Square"; else if(archRatio < 1.2 && archRatio > 0) archForm = "Tapered";
+
+    let symmetry = 100;
+    if(p[5] && p[12] && p[2]) {
+        const rd = dist(p[5], p[2]); const ld = dist(p[12], p[2]);
+        if(Math.max(rd, ld) > 0) symmetry = Math.min(rd, ld) / Math.max(rd, ld) * 100;
+    }
+    
+    let deformity = "Normal";
+    if(midlineDev > 2.0 || symmetry < 80) deformity = "Moderate";
+    if(midlineDev > 3.0 || symmetry < 70) deformity = "Severe";
+
+    generateArchPoints();
+    state.showMeasurements = true;
+
+    document.getElementById('midline-length-val').textContent = midlineLength ? midlineLength.toFixed(1) + " " + unit : "--";
+    document.getElementById('icw-val').textContent = icw ? icw.toFixed(1) + " " + unit : "--";
+    document.getElementById('imw-val').textContent = imw ? imw.toFixed(1) + " " + unit : "--";
+    document.getElementById('imw-cusp-val').textContent = imwCusp ? imwCusp.toFixed(1) + " " + unit : "--";
+    document.getElementById('pmw-val').textContent = pmw ? pmw.toFixed(1) + " " + unit : "--";
+    document.getElementById('midline-val').textContent = midlineDev.toFixed(1) + " " + unit;
+    document.getElementById('midline-dir').textContent = midlineDev < 0.5 ? "Centered" : midlineDir;
+    document.getElementById('sym-val').textContent = symmetry.toFixed(0) + "%";
+    
+    const at = document.getElementById('arch-form-tag'); at.textContent = archForm;
+    at.className = `tag ${archForm === 'Square' ? 'green' : archForm === 'Tapered' ? 'orange' : 'blue'}`;
+    document.getElementById('arch-ratio-val').textContent = `Ratio: ${archRatio.toFixed(2)}`;
+    
+    const dt = document.getElementById('deformity-tag'); dt.textContent = deformity;
+    dt.className = `tag ${deformity === 'Severe' ? 'red' : deformity === 'Moderate' ? 'orange' : 'green'}`;
+
+    generateRecommendations(midlineVal => midlineDev, archForm, deformity);
+    document.getElementById('results-container').style.display = 'block';
+    document.getElementById('empty-state').style.display = 'none';
+    draw();
+}
+
+function generateArchPoints() {
+    state.archPoints = [];
+    const order = [17, 8, 7, 6, 5, 4, 3, 2, 10, 11, 12, 13, 14, 15, 18];
+    order.forEach(idx => {
+        if(state.points[idx] && !state.missingTeeth[idx]) state.archPoints.push(state.points[idx]);
+    });
+}
+
+function generateRecommendations(getDev, form, def) {
+    const recs = [];
+    const missing = state.missingTeeth.filter(m => m).length;
+    if(missing) recs.push(`• ${missing} missing teeth detected.`);
+    const dev = parseFloat(document.getElementById('midline-val').textContent);
+    if(dev > 2.0) recs.push(`• Midline deviation ${dev.toFixed(1)}mm needs correction.`);
+    if(form === 'Tapered') recs.push(`• Tapered arch may need expansion.`);
+    if(def === 'Severe') recs.push(`• Severe deformity: Ortho eval required.`);
+    document.getElementById('recommendations').innerHTML = recs.length ? recs.join('<br>') : 'Arch form appears normal.';
+}
+
+function undoPoint() { if(state.currIdx > 0) { state.currIdx--; state.points[state.currIdx] = null; state.missingTeeth[state.currIdx] = false; draw(); updateSidebar(); } }
+function resetAll() { if(confirm("Reset all?")) init(); }
+
+function openCalibrationSettings(force=false){
+    document.getElementById('calib-settings-modal').style.display = 'block';
+    updateCalibSettingsUI();
+}
+function closeCalibrationSettings(){ document.getElementById('calib-settings-modal').style.display = 'none'; }
+function updateCalibSettingsUI(){
+    const mode = document.querySelector('input[name="calib-method"]:checked').value;
+    document.getElementById('pixel-calib-fields').style.display = mode==='pixel' ? 'block' : 'none';
+    document.getElementById('calib-opt-manual').classList.toggle('selected', mode==='manual');
+    document.getElementById('calib-opt-pixel').classList.toggle('selected', mode==='pixel');
+}
+function invertPxMm(){ const i = document.getElementById('px-per-mm'); if(i.value) i.value = (1.0/parseFloat(i.value)).toFixed(6); }
+function applyCalibrationSettings(){
+    const mode = document.querySelector('input[name="calib-method"]:checked').value;
+    if(mode==='pixel'){
+        const v = parseFloat(document.getElementById('px-per-mm').value);
+        if(v>0) { state.ppm = v; closeCalibrationSettings(); draw(); }
+    } else {
+        closeCalibrationSettings();
+        document.getElementById('calib-modal').style.display = 'block';
+    }
+}
+function applyCalibration() {
+    const mm = parseFloat(document.getElementById('known-mm').value);
+    if(!mm) return;
+    const type = document.getElementById('calib-ref-type').value;
+    let p1, p2;
+    if(type==='icw') { p1=state.points[5]; p2=state.points[12]; }
+    else if(type==='imw') { p1=state.points[8]; p2=state.points[15]; }
+    else if(type==='midline') { p1=state.points[2]; p2=state.points[0]; }
+    if(p1 && p2) {
+        state.ppm = Math.hypot(p1.x - p2.x, p1.y - p2.y) / mm;
+        document.getElementById('calib-indicator').textContent = `Calibrated`;
+        closeModal('calib-modal');
+        analyze();
+    }
+}
+
+function openRefGuide() { document.getElementById('ref-modal').style.display = 'block'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+async function exportPDF() {
+    if(state.currIdx < 7) { alert("Complete analysis first."); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
+    
+    doc.setFontSize(20); doc.text('Occlusal Analysis Report', 105, 20, null, null, 'center');
+    doc.setFontSize(10); doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 30);
+    
+    const canvas = document.getElementById('face-canvas');
+    const imgData = await html2canvas(canvas).then(c => c.toDataURL('image/png'));
+    const imgH = (canvas.height * 170) / canvas.width;
+    doc.addImage(imgData, 'PNG', 20, 40, 170, imgH);
+    
+    let y = 40 + imgH + 10;
+    doc.setFontSize(14); doc.text('Results', 20, y); y += 10;
+    doc.setFontSize(10);
+    
+    const addLine = (txt) => { doc.text(txt, 20, y); y += 6; };
+    addLine(`Midline Length: ${document.getElementById('midline-length-val').textContent}`);
+    addLine(`ICW: ${document.getElementById('icw-val').textContent}`);
+    addLine(`IMW: ${document.getElementById('imw-val').textContent}`);
+    addLine(`Arch Form: ${document.getElementById('arch-form-tag').textContent}`);
+    addLine(`Midline Dev: ${document.getElementById('midline-val').textContent}`);
+    
+    y += 5;
+    doc.setFontSize(12); doc.setTextColor(23, 162, 184); doc.text('Recommendations:', 20, y); y += 7;
+    doc.setTextColor(0,0,0); doc.setFontSize(10);
+    const recs = document.getElementById('recommendations').innerText.split('\n');
+    recs.forEach(r => { if(r.trim()) addLine(r); });
+
+    doc.save('occlusal-report.pdf');
+}
+
+window.onload = function() { init(); setupEvents(); rrzAutoLoadFromPhoto(); };
+</script>
+</body>
+</html>
