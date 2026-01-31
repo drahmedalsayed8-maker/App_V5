@@ -9,7 +9,6 @@
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#2563eb" />
 
-  <!-- Icons -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
 </head>
 <body>
@@ -39,7 +38,6 @@
 
   <main class="container">
 
-    <!-- Connection Settings (collapsible) -->
     <section class="card settings" id="settingsCard">
       <div class="settings-row">
         <div class="field">
@@ -70,9 +68,7 @@
       </div>
     </section>
 
-    <!-- Upload -->
     <section class="grid">
-      <!-- Upload Card -->
       <section class="card">
         <h2><i class="fa-solid fa-cloud-arrow-up"></i> رفع صورة البانوراما</h2>
 
@@ -82,7 +78,9 @@
           <div class="dz-icon"><i class="fa-solid fa-image"></i></div>
           <div class="dz-title">اضغط لاختيار صورة أو اسحبها هنا</div>
           <div class="dz-sub">يدعم JPG / PNG / WebP — يفضّل صورة واضحة بدقة عالية.</div>
-          <div class="dz-actions">
+        </div>
+
+        <div class="dz-actions" style="margin-top: 15px; display: flex; justify-content: center; gap: 10px;">
             <button class="btn btn-primary" id="chooseBtn" type="button">
               <i class="fa-solid fa-folder-open"></i> اختيار صورة
             </button>
@@ -92,7 +90,6 @@
             <button class="btn btn-danger" id="clearBtn" type="button">
               <i class="fa-solid fa-trash"></i> مسح
             </button>
-          </div>
         </div>
 
         <div id="fileMeta" class="filemeta" style="display:none;">
@@ -105,20 +102,17 @@
         </div>
       </section>
 
-      <!-- Preview Card -->
       <section class="card preview" id="previewWrap" style="display:none;">
         <h2><i class="fa-solid fa-eye"></i> معاينة</h2>
         <img id="previewImage" alt="Preview" />
       </section>
     </section>
 
-    <!-- Loader -->
     <div class="loader" id="loader" aria-live="polite">
       <div class="spinner"></div>
       <p id="loaderText">جاري التحليل...</p>
     </div>
 
-    <!-- Results -->
     <section class="results-container" id="resultsArea" style="display:none;">
       <div class="card sectionSeg">
         <div class="sectionTitle" style="color:#ef4444;">Segmentation</div>
