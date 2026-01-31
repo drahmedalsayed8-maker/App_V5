@@ -49,16 +49,59 @@
     }
     .calibration-container { 
       display: flex; gap: 20px; padding: 20px; 
-      justify-content: center; align-items: center; flex-wrap: wrap;
+      justify-content: center; align-items: stretch; 
+      flex-wrap: nowrap; flex-direction: row-reverse;
+      width: 100%;
     }
     .calibration-canvas-wrapper { 
       position: relative; border: 2px solid var(--gold); 
       border-radius: 10px; overflow: hidden; 
+      flex: 1 1 520px; min-width: 260px; max-width: 520px;
+      display: flex;
     }
+    /* calibrationCanvas sizing */
+    #calibrationCanvas{ width:100%; height:100%; display:block; }
+
     .calibration-controls { 
       background: rgba(15,23,42,0.9); padding: 20px; border-radius: 15px; 
       min-width: 300px; max-width: 400px; border: 1px solid rgba(197,160,89,0.3);
+      overflow: auto; -webkit-overflow-scrolling: touch;
     }
+    @media (max-width: 900px) {
+      .calibration-container{
+        flex-direction: column;
+        align-items: stretch;
+        flex-wrap: nowrap;
+      }
+      .calibration-controls{
+        max-width: 100%;
+        min-width: 0;
+      }
+      .calibration-canvas-wrapper{
+        max-width: 100%;
+        min-width: 0;
+        height: 60vh;
+      }
+    }
+    @media (max-width: 900px) and (orientation: landscape) {
+      .calibration-container{
+        flex-direction: row-reverse;
+        align-items: stretch;
+      }
+      .calibration-controls{
+        flex: 0 0 52%;
+        max-width: 52%;
+        max-height: 85vh;
+      }
+      .calibration-canvas-wrapper{
+        flex: 0 0 46%;
+        max-width: 46%;
+        max-height: 85vh;
+        height: auto;
+      }
+      #calibrationCanvas{ height: 100%; }
+    }
+
     .calibration-btn { 
       width: 100%; padding: 16px; margin: 8px 0; border: none; 
       border-radius: 12px; font-weight: bold; cursor: pointer; 
@@ -652,7 +695,7 @@
 
     <div class="upload-group">
       <label for="imgLoader" id="btnUploadCeph" class="upload-btn" role="button" tabindex="0">☠ Upload Cephalometric</label>
-      <input type="file" id="imgLoader" accept="image/*" style="display:none">
+      <input type="file" id="imgLoader" accept="image/*" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;">
     </div>
 
     <p style="margin-top: 25px; font-size: 12px; color: #94a3b8;">CephPro Elite v3.0 | 12 Angles Complete</p>
@@ -1409,12 +1452,92 @@ Phase 3 (Months 13-18): Finishing and detailing
   function rrzEnsureCanvasBackground(cv, img, ratio){
     try{
       if(!cv || !img) return;
+      // If background is missing (common on some mobile reflow cases), re-apply it safely
       if(!cv.backgroundImage){
-        const bg = new fabric.Image(img);
+        const w = (cv.getWidth && cv.getWidth()) ? cv.getWidth() : cv.width;
+        const h = (cv.getHeight && cv.getHeight()) ? cv.getHeight() : cv.height;
+        const bg = new fabric.Image(img, {
+          originX: 'center',
+          originY: 'center',
+          left: (w || 0) / 2,
+          top: (h || 0) / 2,
+          selectable: false,
+          evented: false
+        });
         bg.scale(ratio || 1);
         cv.setBackgroundImage(bg, cv.renderAll.bind(cv));
+      }else{
+        // Ensure a render happens after any layout changes
+        try{ cv.requestRenderAll && cv.requestRenderAll(); }catch(_e){}
       }
     }catch(e){}
+  }
+
+  function rrzInitCalibrationCanvas(img){
+    try{
+      if(!img) return 1;
+
+      const wrapper = document.querySelector('.calibration-canvas-wrapper');
+      const controls = document.querySelector('.calibration-controls');
+
+      let w = wrapper ? Math.max(10, wrapper.clientWidth) : 0;
+      let h = wrapper ? Math.max(10, wrapper.clientHeight) : 0;
+
+      // If wrapper hasn't been laid out yet (mobile reflow), borrow height from controls
+      if((!h || h < 120) && controls){
+        const ch = controls.getBoundingClientRect ? controls.getBoundingClientRect().height : controls.offsetHeight;
+        if(ch) h = Math.max(h, ch);
+      }
+
+      // Fallbacks
+      if(!w || w < 120) w = Math.max(260, Math.min(window.innerWidth * 0.48, 560));
+      if(!h || h < 120) h = Math.max(260, window.innerHeight - 220);
+
+      const calCanvasEl = document.getElementById('calibrationCanvas');
+      if(!calCanvasEl) return 1;
+
+      // Match the canvas to the wrapper size (this is what makes the image as tall as the list)
+      calCanvasEl.width = Math.floor(w);
+      calCanvasEl.height = Math.floor(h);
+
+      // Re-create fabric canvas to avoid stale internal sizes
+      try{ if(window.calibrationCanvas && window.calibrationCanvas.dispose) window.calibrationCanvas.dispose(); }catch(_e){}
+      try{ if(typeof calibrationCanvas !== 'undefined' && calibrationCanvas && calibrationCanvas.dispose) calibrationCanvas.dispose(); }catch(_e){}
+
+      calibrationCanvas = new fabric.Canvas('calibrationCanvas', { selection: false, width: calCanvasEl.width, height: calCanvasEl.height });
+      window.calibrationCanvas = calibrationCanvas;
+
+      try{ calibrationCanvas.preserveObjectStacking = true; }catch(_e){}
+      try{ calibrationCanvas.allowTouchScrolling = false; }catch(_e){}
+
+      const pad = 0.98;
+      const ratio = Math.min((w * pad) / img.width, (h * pad) / img.height);
+
+      const fabImg = new fabric.Image(img, {
+        originX: 'center',
+        originY: 'center',
+        left: w / 2,
+        top: h / 2,
+        selectable: false,
+        evented: false
+      });
+      fabImg.scale(ratio);
+
+      calibrationCanvas.setBackgroundImage(fabImg, calibrationCanvas.renderAll.bind(calibrationCanvas));
+      window.RRZ_CalibrationRatio = ratio;
+      window.RRZ_ImageRatio = ratio;
+
+      // Gestures support (pinch zoom / pan) if present
+      try{ rrzEnablePinchZoom(calibrationCanvas); }catch(_e){}
+      try{ rrzEnableCalibrationPanZoom(calibrationCanvas); }catch(_e){}
+
+      // Extra delayed render to mitigate blank-canvas on some mobile browsers
+      setTimeout(() => { try{ calibrationCanvas.requestRenderAll(); }catch(_e){} }, 80);
+
+      return ratio;
+    }catch(_e){
+      return 1;
+    }
   }
 
   function rrzEnablePinchZoom(cv){
@@ -1832,28 +1955,24 @@ Phase 3 (Months 13-18): Finishing and detailing
         document.getElementById('main-home').style.display = 'none';
         document.getElementById('calibration-view').style.display = 'flex';
         
-        // Initialize calibration canvas
-        const ratio = Math.min((window.innerWidth * 0.7)/img.width, (window.innerHeight - 200)/img.height);
-        const calCanvas = document.getElementById('calibrationCanvas');
-        calCanvas.width = img.width * ratio;
-        calCanvas.height = img.height * ratio;
-        
-        calibrationCanvas = new fabric.Canvas('calibrationCanvas', { selection: false });
-        calibrationCanvas.preserveObjectStacking = true;
-        try{ calibrationCanvas.allowTouchScrolling = false; }catch(_e){}
-        const fabImg = new fabric.Image(img);
-        fabImg.scale(ratio);
-        calibrationCanvas.setBackgroundImage(fabImg, calibrationCanvas.renderAll.bind(calibrationCanvas));
-        // Keep ratio available (for safety re-apply)
-        window.RRZ_CalibrationRatio = ratio;
-        // Enable mobile pinch zoom on calibration canvas (two-finger)
-        try{ rrzEnablePinchZoom(calibrationCanvas); }catch(_e){} 
-try{ rrzEnableCalibrationPanZoom(calibrationCanvas); }catch(e){}
-        try{ rrzEnsureCanvasBackground(calibrationCanvas, img, window.RRZ_CalibrationRatio); }catch(_e){}
-// Store original image for main canvas later
+        // Initialize calibration canvas (delay to ensure container is visible & sized, especially on mobile)
+        let ratio = 1;
+        const doInitCal = () => {
+          try{
+            ratio = rrzInitCalibrationCanvas(img) || 1;
+          }catch(e){ ratio = 1; }
+          // Keep ratio available (for safety re-apply)
+          window.RRZ_CalibrationRatio = ratio;
+          try{ rrzEnsureCanvasBackground(calibrationCanvas, img, ratio); }catch(_e){}
+        };
+
+        // Give the browser a moment to repaint/reflow after display:flex switch
+        setTimeout(() => { requestAnimationFrame(doInitCal); }, (window.innerWidth <= 900 ? 140 : 60));
+
+        // Store original image for main canvas later
         window.RRZ_OriginalImage = img;
         window.RRZ_ImageRatio = ratio;
-        
+
         // Reset calibration data
         calibrationScale = 1.0;
         calibrationPoints = { p1: null, p2: null };
@@ -2054,7 +2173,7 @@ isCalibrationMode = true;
     if (rrzIsMobile() && !rrzIsLandscape()) {
       rrzRequireLandscapeThen(startAnalysis);
     } else {
-      startAnalysis();
+    setTimeout(startAnalysis, (window.innerWidth <= 900 ? 120 : 40));
     }
   }
 
@@ -5455,6 +5574,22 @@ ${phase.tasks.map(task => `- ${task}`).join('\n')}`
       setTimeout(() => {
           try { rrzApplyPatientNameToUI(); } catch(e) {}
       }, 100);
+
+      // Mobile-safe upload trigger (Safari/iOS blocks label->input when input is display:none)
+      try{
+        const u = document.getElementById('imgLoader');
+        const b = document.getElementById('btnUploadCeph');
+        if(u && b){
+          const trigger = (ev) => { try{ ev && ev.preventDefault && ev.preventDefault(); }catch(_e){} try{ u.click(); }catch(_e){} };
+          b.addEventListener('click', trigger);
+          b.addEventListener('touchstart', trigger, { passive: false });
+          b.addEventListener('keydown', (ev) => {
+            if(ev.key === 'Enter' || ev.key === ' '){
+              trigger(ev);
+            }
+          });
+        }
+      }catch(e){}
   });
 
   // ===== Reference Cephalometric Image =====
