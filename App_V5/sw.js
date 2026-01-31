@@ -2,7 +2,7 @@
 هدفه: منع تعارض الـ SW (sw.js vs service-worker.js) + تثبيت Offline/Cache بدون فشل install.
 ملاحظة: لا يَكِش ملفات كبيرة/ديناميكية (PDF runtime, blobs) بشكل مقصود.
 */
-// تم تحديث الإصدار إلى 1.14 لضمان تحميل التعديلات الجديدة في pano.html
+// تم تحديث الإصدار إلى 1.12 لضمان تحميل التعديلات الجديدة في voice-report.html
 const CACHE_VERSION = 'rrz-unified-v1.14';
 const CORE = [
 './',
@@ -15,8 +15,6 @@ const CORE = [
 // Core modules
 'Ceph.html',
 'ceph.html',
-'ceph_mobile_fixed.html', // mobile-patched ceph (optional)
-
 'pano.html',
 'shared/aiClient.js',
 'panorama/style.css',
