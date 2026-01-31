@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Royal Ray Zone + AccuRay Annotator (Unified)</title>
 
   <!-- Royal Ray Zone deps -->
@@ -18,6 +18,7 @@
       background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
       min-height: 100vh;
       color: white;
+      overscroll-behavior: none; /* Prevent browser bounce */
     }
 
     .glass-dark { background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(20px); border: 1px solid rgba(59, 130, 246, 0.3); }
@@ -220,6 +221,7 @@
       overflow:hidden;
       height: min(62vh, calc(100vh - 240px));
       position:relative;
+      touch-action: none; /* Crucial for gestures */
     }
     .annotatorRoot .a-stage{
       position:relative;
@@ -234,6 +236,7 @@
       height:100%;
       background: transparent;
       cursor: crosshair;
+      touch-action: none;
     }
 
     .annotatorRoot .measurement-label {
@@ -1408,6 +1411,7 @@ const expImage = document.getElementById('rrz_expImage');
        - FIX: show/hide section resize issue
        - ADD: Undo in toolbar
        - IMPROVE: History-based Undo (works with move/edit/delete)
+       - NEW: Pan & Zoom with Gestures / Wheel. Text tool auto-deselect.
     ========================================================== */
     (function(){
       const $ = (id) => document.getElementById(id);
@@ -1428,6 +1432,12 @@ const expImage = document.getElementById('rrz_expImage');
       let history = [];
       let historyIndex = -1;
       let dragCommitArmed = false; // to commit after move/edit drag ends
+
+      // Gesture State (Pinch/Pan)
+      let activePointers = new Map();
+      let isGesturing = false;
+      let prevPinchDist = -1;
+      let prevPinchCenter = null;
 
       function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
 
@@ -1557,10 +1567,7 @@ const expImage = document.getElementById('rrz_expImage');
       let totalCells = 0;
 
 
-      /* ===== Voice (Speech-to-Text) =====
-         - Click Start Voice: begin dictation
-         - Click Stop Voice: add the dictated text as a TEXT object (editable like any other tool)
-      */
+      /* ===== Voice (Speech-to-Text) ===== */
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const annVoice = { rec: null, active: false, finalText: "", pendingText: "" };
 
@@ -1661,7 +1668,12 @@ const expImage = document.getElementById('rrz_expImage');
               undoHistory();
               return;
             }
-            setTool(t.id);
+            // If clicking same tool, toggle off (deselect)
+            if (currentTool === t.id) {
+               setTool(null);
+            } else {
+               setTool(t.id);
+            }
           });
           grid.appendChild(b);
         });
@@ -1673,11 +1685,21 @@ const expImage = document.getElementById('rrz_expImage');
         anglePoints = [];
         drawingPolygon = false; polygonPoints = [];
         drawingArea = false; areaPoints = [];
+        
+        // Reset pointers state on tool switch
+        activePointers.clear();
+        isGesturing = false;
 
         [...document.querySelectorAll(".a-toolBtn")].forEach(el => {
           el.classList.toggle("active", el.dataset.tool === id);
         });
-        canvas.style.cursor = (id === "TEXT") ? "text" : "crosshair";
+        
+        // If no tool selected, show default cursor (grab)
+        if (!id) {
+           canvas.style.cursor = "default";
+        } else {
+           canvas.style.cursor = (id === "TEXT") ? "text" : "crosshair";
+        }
       }
 
       function resize() {
@@ -2410,37 +2432,84 @@ $("a_exportReportBtn").addEventListener("click", ()=>{
         updateGrid();
 });
 
-      /* a_sendToRRZBtn removed */
-// Pointer events
-      canvas.addEventListener("pointerdown", (e)=>{
-        canvas.setPointerCapture(e.pointerId);
-        hideContextMenu();
+// ========= 3) Pointer Events: Drawing + Pinch/Zoom + Pan =========
+      
+      // Wheel Zoom (PC)
+      canvas.addEventListener("wheel", (e)=>{
+          e.preventDefault();
+          const rect = canvas.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          const mouseY = e.clientY - rect.top;
+          
+          // Determine scale factor
+          const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+          
+          // Calculate world point before zoom
+          const before = { x: (mouseX - view.x) / view.scale, y: (mouseY - view.y) / view.scale };
+          
+          // Apply zoom
+          view.scale *= zoomFactor;
+          view.scale = Math.max(0.05, Math.min(12, view.scale));
+          
+          // Adjust offset to zoom towards mouse
+          view.x = mouseX - before.x * view.scale;
+          view.y = mouseY - before.y * view.scale;
+          
+          updateEditPoints();
+          draw();
+      }, { passive: false });
 
+
+      canvas.addEventListener("pointerdown", (e)=>{
+        // Track pointers for gestures
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        
+        // If 2 pointers -> Gesture Mode
+        if(activePointers.size === 2){
+            isGesturing = true;
+            // Clear single-pointer drawing if it started
+            isDown = false; startPt = null; tempPts = []; draggingObject = false; draggingPoint = false;
+            
+            // Calc initial Pinch state
+            const pts = Array.from(activePointers.values());
+            const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+            prevPinchDist = d;
+            prevPinchCenter = { x: (pts[0].x + pts[1].x)/2, y: (pts[0].y + pts[1].y)/2 };
+            return;
+        }
+
+        // If Gesturing, ignore new touches
+        if(isGesturing) return;
+
+        hideContextMenu();
         const m = getMousePos(e);
         const wpt = screenToWorld(m);
 
+        // Edit Points (if edit mode)
         if(editMode && selectedObject){
           const pointIndex = hitTestEditPoint(m);
           if(pointIndex !== -1){
             draggingPoint = true;
             draggedPointIndex = pointIndex;
-            dragCommitArmed = true; // commit on pointerup
+            dragCommitArmed = true; 
             return;
           }
         }
 
+        // Move Object (if edit mode)
         if(editMode && selectedObject){
           const hitSel = hitTestObject(wpt);
           if(hitSel.object && hitSel.index === selectedObjectIndex){
             draggingObject = true;
             dragStartWorld = wpt;
             dragObjectSnapshot = deepClone(selectedObject);
-            dragCommitArmed = true; // commit on pointerup
+            dragCommitArmed = true; 
             return;
           }
         }
 
-        if(!editMode && !isDown && !drawingPolygon && !drawingArea){
+        // Select Object (if no tool)
+        if(!isDown && !drawingPolygon && !drawingArea && !currentTool){
           const hit = hitTestObject(wpt);
           if(hit.object){
             selectedObject = hit.object;
@@ -2450,28 +2519,31 @@ $("a_exportReportBtn").addEventListener("click", ()=>{
             draw();
             return;
           }else{
+            // If clicked on empty space without a tool -> Start Pan (will be handled in move)
             selectedObject=null; selectedObjectIndex=-1; editMode=false; hideEditPoints();
+            draw();
           }
         }
 
+        // Text Tool
         if(currentTool === "TEXT"){
           const t = prompt("اكتب النص:");
           if(t && t.trim()){
             objects.push({ type:"text", p:wpt, text:t.trim() });
-            commitHistory(); // <-- history
+            commitHistory(); 
             draw();
+            // FIX: Auto-deselect tool after adding text
+            setTool(null);
           }
           return;
         }
 
         if(currentTool === "ANGLE"){
           anglePoints.push(wpt);
-
-          // Redraw immediately so placed points/preview are visible while building the angle
           if(anglePoints.length === 3){
             objects.push({ type:"angle", points:[...anglePoints] });
             anglePoints = [];
-            commitHistory(); // <-- history
+            commitHistory(); 
           }
           draw();
           return;
@@ -2490,13 +2562,58 @@ $("a_exportReportBtn").addEventListener("click", ()=>{
           draw();
           return;
         }
-
-        isDown = true;
-        startPt = wpt;
-        tempPts = [];
+        
+        // If a drawing tool is active -> Start Drawing
+        if(currentTool){
+            isDown = true;
+            startPt = wpt;
+            tempPts = [];
+        }
       });
 
       canvas.addEventListener("pointermove", (e)=>{
+        // Update pointer pos
+        if(activePointers.has(e.pointerId)){
+            activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        }
+        
+        // 1. Handle Pinch/Zoom/Pan (Two fingers)
+        if(isGesturing && activePointers.size === 2){
+            const pts = Array.from(activePointers.values());
+            const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+            const center = { x: (pts[0].x + pts[1].x)/2, y: (pts[0].y + pts[1].y)/2 };
+            
+            if(prevPinchDist > 0){
+                // Zoom
+                const zoomFactor = d / prevPinchDist;
+                // Zoom around the center of the pinch
+                const rect = canvas.getBoundingClientRect();
+                const centerXrel = prevPinchCenter.x - rect.left;
+                const centerYrel = prevPinchCenter.y - rect.top;
+                
+                const before = { x: (centerXrel - view.x)/view.scale, y: (centerYrel - view.y)/view.scale };
+                
+                view.scale *= zoomFactor;
+                view.scale = Math.max(0.05, Math.min(12, view.scale));
+                
+                view.x = centerXrel - before.x * view.scale;
+                view.y = centerYrel - before.y * view.scale;
+
+                // Pan (Move center)
+                const dx = center.x - prevPinchCenter.x;
+                const dy = center.y - prevPinchCenter.y;
+                view.x += dx;
+                view.y += dy;
+                
+                updateEditPoints();
+                draw();
+            }
+            prevPinchDist = d;
+            prevPinchCenter = center;
+            return;
+        }
+
+        // 2. Normal Mouse/Touch Move
         const m = getMousePos(e);
         const wpt = screenToWorld(m);
 
@@ -2532,19 +2649,53 @@ $("a_exportReportBtn").addEventListener("click", ()=>{
           return;
         }
 
-        if(!isDown) return;
-        tempPts[0] = wpt;
-        draw();
+        if(isDown && currentTool){
+            tempPts[0] = wpt;
+            draw();
+            return;
+        }
+        
+        // 3. Pan (One finger / Mouse drag) if NO TOOL and NOT EDITING
+        // Only if we are dragging (buttons=1 for mouse, or just touch move)
+        if(!currentTool && !editMode && activePointers.size === 1){
+             // Simple check if it's a drag: we need previous position.
+             // But pointermove fires often. Let's use movementX/Y if available or calc delta
+             // MovementX/Y is easiest for PC, but inconsistent on mobile.
+             // We can use the activePointers change, but we didn't store prev there in a simple way for delta.
+             // Easier: rely on isDown? No, isDown is for tools.
+             // Let's rely on standard drag logic for pan.
+             if(e.buttons === 1 || e.pointerType === 'touch'){
+                 // We need a 'lastPos' for panning
+                 if(this.lastPanPos){
+                     const dx = m.x - this.lastPanPos.x;
+                     const dy = m.y - this.lastPanPos.y;
+                     view.x += dx;
+                     view.y += dy;
+                     updateEditPoints();
+                     draw();
+                 }
+             }
+        }
+        this.lastPanPos = m;
       });
 
-      canvas.addEventListener("pointerup", ()=>{
+      canvas.addEventListener("pointerup", (e)=>{
+        activePointers.delete(e.pointerId);
+        
+        if(activePointers.size < 2){
+            isGesturing = false;
+        }
+        
+        // Reset Pan
+        this.lastPanPos = null;
+
         if(draggingObject){
           draggingObject = false;
           dragStartWorld = null;
           dragObjectSnapshot = null;
           if(dragCommitArmed){
             dragCommitArmed = false;
-            commitHistory(); // <-- history after drag ends
+            commitHistory(); 
           }
           return;
         }
@@ -2554,7 +2705,7 @@ $("a_exportReportBtn").addEventListener("click", ()=>{
           draggedPointIndex = -1;
           if(dragCommitArmed){
             dragCommitArmed = false;
-            commitHistory(); // <-- history after edit ends
+            commitHistory(); 
           }
           return;
         }
@@ -2584,6 +2735,20 @@ $("a_exportReportBtn").addEventListener("click", ()=>{
         startPt = null;
         tempPts = [];
         draw();
+      });
+
+      canvas.addEventListener("pointercancel", (e)=>{
+          activePointers.delete(e.pointerId);
+          isGesturing = false;
+          isDown = false;
+      });
+      canvas.addEventListener("pointerout", (e)=>{
+          // Optional: handle if pointer leaves canvas while dragging
+          // But usually we want to keep tracking if captured.
+          // For now, removing it avoids stuck pointers.
+          if(e.pointerType === 'mouse') {
+            activePointers.delete(e.pointerId);
+          }
       });
 
       canvas.addEventListener("dblclick", ()=>{
@@ -2821,7 +2986,8 @@ $("a_downloadGridBtn").addEventListener("click", ()=>{
       }
       updateCalBadge();
 
-      setTool("LINE");
+      // Start with no tool selected (Nav mode)
+      setTool(null);
       resize();
       window.addEventListener("resize", resize);
     })();
