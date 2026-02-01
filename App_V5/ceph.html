@@ -49,59 +49,24 @@
     }
     .calibration-container { 
       display: flex; gap: 20px; padding: 20px; 
-      justify-content: center; align-items: stretch; 
-      flex-wrap: nowrap; flex-direction: row-reverse;
-      width: 100%;
+      justify-content: center; align-items: center; flex-wrap: wrap;
     }
     .calibration-canvas-wrapper { 
-      position: relative; border: 2px solid var(--gold); 
-      border-radius: 10px; overflow: hidden; 
-      flex: 1 1 520px; min-width: 260px; max-width: 520px;
+      position: relative;
+      border: 2px solid var(--gold);
+      border-radius: 10px;
+      overflow: hidden;
       display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
     }
-    /* calibrationCanvas sizing */
-    #calibrationCanvas{ width:100%; height:100%; display:block; }
-
+    /* Ensure canvases are centered (important in RTL where inline canvases may align right) */
+    canvas{ display:block; margin:0 auto; touch-action: none; }
     .calibration-controls { 
       background: rgba(15,23,42,0.9); padding: 20px; border-radius: 15px; 
       min-width: 300px; max-width: 400px; border: 1px solid rgba(197,160,89,0.3);
-      overflow: auto; -webkit-overflow-scrolling: touch;
     }
-    @media (max-width: 900px) {
-      .calibration-container{
-        flex-direction: column;
-        align-items: stretch;
-        flex-wrap: nowrap;
-      }
-      .calibration-controls{
-        max-width: 100%;
-        min-width: 0;
-      }
-      .calibration-canvas-wrapper{
-        max-width: 100%;
-        min-width: 0;
-        height: 60vh;
-      }
-    }
-    @media (max-width: 900px) and (orientation: landscape) {
-      .calibration-container{
-        flex-direction: row-reverse;
-        align-items: stretch;
-      }
-      .calibration-controls{
-        flex: 0 0 52%;
-        max-width: 52%;
-        max-height: 85vh;
-      }
-      .calibration-canvas-wrapper{
-        flex: 0 0 46%;
-        max-width: 46%;
-        max-height: 85vh;
-        height: auto;
-      }
-      #calibrationCanvas{ height: 100%; }
-    }
-
     .calibration-btn { 
       width: 100%; padding: 16px; margin: 8px 0; border: none; 
       border-radius: 12px; font-weight: bold; cursor: pointer; 
@@ -173,10 +138,81 @@
     
     @media (max-width: 768px) { .board-grid { grid-template-columns: 1fr; } .report-card { width: 95%; } }
 
+    /* === RRZ MOBILE LANDSCAPE PATCH: show image beside landmark list + touch pan/zoom === */
+#analysis-workspace{
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  overflow: hidden;
+  background: #000;
+}
+#analysis-workspace #canvas-container-wrapper{
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  background: #000;
+}
+
+/* Mobile landscape: split view (Landmarks list beside image) */
+@media (orientation: landscape) and (max-width: 1024px) and (pointer: coarse) {
+  #analysis-workspace{
+    flex-direction: row-reverse; /* RTL-friendly: list on the right */
+  }
+  #analysis-workspace .lm-sidebar{
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    width: min(360px, 38vw);
+    height: calc(100vh - 88px); /* header safe space */
+    max-height: none;
+    margin: 10px;
+    z-index: 80;
+  }
+  #analysis-workspace #canvas-container-wrapper{
+    flex: 1;
+  }
+  /* keep zoom controls reachable */
+  .zoom-controls{
+    top: 78px;
+    right: 10px;
+  }
+}
+
+/* Mobile landscape: also keep Calibration view compact + centered (avoid huge empty panel) */
+@media (orientation: landscape) and (max-width: 1024px) and (pointer: coarse) {
+  #calibration-view{ justify-content: flex-start; }
+  .calibration-container{
+    flex-wrap: nowrap;
+    width: 100%;
+    height: calc(100vh - 70px);
+    padding: 10px;
+    gap: 10px;
+    align-items: stretch;
+  }
+  .calibration-canvas-wrapper{
+    flex: 1;
+    min-width: 0;
+    max-height: 100%;
+  }
+  #calibrationCanvas{ max-width: 100%; max-height: 100%; }
+  .calibration-controls{
+    width: min(360px, 38vw);
+    min-width: 0;
+    max-width: none;
+    max-height: 100%;
+    overflow: auto;
+  }
+}
+
     /* === RRZ Add-on: Landmark sidebar + Report pages === */
     .lm-sidebar{
       position: absolute;
-      top: 12px;
+      top: 72px;
       left: 12px;
       width: 260px;
       max-height: calc(100vh - 170px);
@@ -586,105 +622,7 @@
         opacity: 0;
       }
     }
-  
-    /* ===== RRZ Mobile UX Patch (Ceph): stable canvases + docked sidebar + touch gestures ===== */
-    html, body { height: 100%; }
-    body { overscroll-behavior: none; }
-    #canvas-container-wrapper canvas,
-    .calibration-canvas-wrapper canvas{
-      touch-action: none; /* stop browser scrolling/zooming on the canvas area */
-    }
-
-    .analysis-main{
-      flex: 1;
-      display: flex;
-      position: relative;
-      overflow: hidden;
-    }
-    .analysis-main #canvas-container-wrapper{
-      flex: 1;
-      min-width: 0;
-    }
-    .analysis-main .lm-sidebar{
-      /* default keeps existing overlay behavior on desktop via position:absolute already defined */
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
-    }
-
-    @media (max-width: 920px){
-      .analysis-main{
-        flex-direction: row;
-        gap: 10px;
-        padding: 10px;
-      }
-      .analysis-main .lm-sidebar{
-        position: relative;
-        top: auto; left: auto;
-        width: min(360px, 38vw);
-        height: calc(100vh - 140px);
-        max-height: none;
-        overflow-y: auto;
-      }
-      .zoom-controls{ top: 76px; right: 10px; }
-    }
-
-    @media (max-width: 920px) and (orientation: portrait){
-      .analysis-main{ flex-direction: column; }
-      .analysis-main .lm-sidebar{
-        width: 100%;
-        height: 38vh;
-      }
-      .analysis-main #canvas-container-wrapper{
-        height: calc(62vh - 20px);
-      }
-    }
-
-    .rrz-landscape-overlay{
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.78);
-      z-index: 5000;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 18px;
-    }
-    .rrz-landscape-card{
-      width: min(520px, 95vw);
-      background: rgba(15,23,42,0.95);
-      border: 1px solid rgba(197,160,89,0.7);
-      border-radius: 22px;
-      padding: 18px;
-      text-align: center;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-    }
-    .rrz-landscape-card h3{
-      margin: 10px 0 6px 0;
-      color: var(--gold);
-      font-size: 18px;
-    }
-    .rrz-landscape-card p{
-      margin: 0 0 14px 0;
-      color: rgba(255,255,255,0.88);
-      font-size: 13px;
-      line-height: 1.6;
-    }
-    .rrz-landscape-card .rrz-btn{
-      width: 100%;
-      padding: 12px 14px;
-      border-radius: 14px;
-      border: 1px solid rgba(197,160,89,0.7);
-      background: rgba(197,160,89,0.95);
-      color: #0b1220;
-      font-weight: 900;
-      cursor: pointer;
-    }
-    .rrz-landscape-card .rrz-btn.secondary{
-      margin-top: 10px;
-      background: rgba(255,255,255,0.08);
-      color: #fff;
-    }
-</style>
+  </style>
 </head>
 <body>
 
@@ -695,7 +633,7 @@
 
     <div class="upload-group">
       <label for="imgLoader" id="btnUploadCeph" class="upload-btn" role="button" tabindex="0">☠ Upload Cephalometric</label>
-      <input type="file" id="imgLoader" accept="image/*" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;">
+      <input type="file" id="imgLoader" accept="image/*" style="display:none">
     </div>
 
     <p style="margin-top: 25px; font-size: 12px; color: #94a3b8;">CephPro Elite v3.0 | 12 Angles Complete</p>
@@ -760,15 +698,18 @@
     <button class="zoom-btn" onclick="resetZoom()" title="Reset Zoom">⟲</button>
   </div>
 
-  <div id="analysis-main" class="analysis-main">
+  
+  <div id="analysis-workspace">
   <div id="canvas-container-wrapper"><canvas id="mainCanvas"></canvas></div>
-  <div class="lm-sidebar" id="lmSidebar" style="display:none;"><h4>Landmarks</h4><div id="lmList"></div>
+  <div class="lm-sidebar" id="lmSidebar" style="display:none;">
+    <h4>Landmarks</h4>
+    <div id="lmList"></div>
     <button id="btnCephRefSidebar" class="lm-ref-btn no-print" onclick="openCephReference()" style="width:100%; margin-top:10px; padding:10px 12px; border-radius:12px; border:1px solid rgba(197,160,89,0.55); background:linear-gradient(90deg, rgba(52,152,219,0.20), rgba(197,160,89,0.25)); color:#fff; font-weight:900; letter-spacing:.3px; cursor:pointer;">REFERENCE CEPHALOMETRIC IMAGE</button>
+  </div>
 </div>
 
-  </div>
-
-  <div class="floating-footer" style="display:none;">
+<div class="floating-footer"
+ style="display:none;">
     <button onclick="generateAnalysis()" class="action-btn" style="background:var(--gold); color:white; min-width: 250px; box-shadow: 0 10px 20px rgba(0,0,0,0.4);">Generate Report 📐</button>
   </div>
 </div>
@@ -1327,21 +1268,6 @@ Phase 3 (Months 13-18): Finishing and detailing
     } catch(e) {}
   }
 </script>
-
-<!-- ===== RRZ Mobile Patch: Landscape Overlay ===== -->
-<div id="rrzLandscapeOverlay" class="rrz-landscape-overlay" aria-hidden="true">
-  <div class="rrz-landscape-card">
-    <div style="font-size:44px; line-height:1;">📱↔️</div>
-    <h3>رجاءً لف الهاتف للوضع الأفقي (Landscape)</h3>
-    <p>علشان تتحكم في وضع النقاط والـ Zoom / Pan بدقة زي الكمبيوتر.</p>
-    <button class="rrz-btn" onclick="rrzTryLockLandscape()">تفعيل Landscape</button>
-    <button class="rrz-btn secondary" onclick="rrzIHaveRotated()">لقد قمت بلف الهاتف ✅</button>
-    <div style="margin-top:10px; font-size:11px; color:rgba(255,255,255,0.65); line-height:1.5;">
-      * لو هاتفك لا يدعم القفل التلقائي للشاشة، فقط لف الهاتف يدويًا ثم اضغط ✅
-    </div>
-  </div>
-</div>
-
 <script>
   // ===== GLOBAL VARIABLES =====
   const canvas = new fabric.Canvas('mainCanvas', { selection: false });
@@ -1376,6 +1302,137 @@ Phase 3 (Months 13-18): Finishing and detailing
   }
   // ===== END RRZ V23 PATCH =====
 
+// ===== RRZ MOBILE TOUCH PATCH: One-finger pan + two-finger pinch zoom (mobile) =====
+function rrzEnableMobilePanZoom(fcv){
+  try{
+    if(!fcv || fcv.__rrzMobilePanZoomEnabled) return;
+    fcv.__rrzMobilePanZoomEnabled = true;
+
+    const el = fcv.upperCanvasEl || fcv.lowerCanvasEl;
+    if(!el) return;
+
+    const isCoarse = (() => {
+      try{ return window.matchMedia && window.matchMedia('(pointer: coarse)').matches; }catch(e){ return false; }
+    })();
+    if(!isCoarse) return; // only for touch-first devices
+
+    let lastX = 0, lastY = 0;
+    let startZoom = 1, startDist = 0;
+    let isPinch = false;
+    let moved = false;
+    let tapStart = { x:0, y:0, t:0 };
+
+    function touchXY(t){
+      return { x: t.clientX, y: t.clientY };
+    }
+    function distance(a,b){
+      const dx = a.x - b.x, dy = a.y - b.y;
+      return Math.hypot(dx, dy);
+    }
+    function midpoint(a,b){
+      return { x:(a.x+b.x)/2, y:(a.y+b.y)/2 };
+    }
+    function relPoint(clientX, clientY){
+      const r = el.getBoundingClientRect();
+      return { x: clientX - r.left, y: clientY - r.top };
+    }
+    function panBy(dx, dy){
+      const vpt = fcv.viewportTransform;
+      vpt[4] += dx;
+      vpt[5] += dy;
+      fcv.requestRenderAll();
+    }
+    function clampZoom(z){
+      return Math.min(Math.max(z, 0.25), 6);
+    }
+
+    el.addEventListener('touchstart', function(e){
+      if(!e.touches || e.touches.length === 0) return;
+
+      moved = false;
+
+      if(e.touches.length === 1){
+        const p = touchXY(e.touches[0]);
+        lastX = p.x; lastY = p.y;
+        tapStart = { x:p.x, y:p.y, t: Date.now() };
+        isPinch = false;
+        // allow tap to place pending landmark on touchend
+      } else if(e.touches.length >= 2){
+        const a = touchXY(e.touches[0]);
+        const b = touchXY(e.touches[1]);
+        startDist = distance(a,b);
+        startZoom = fcv.getZoom();
+        isPinch = true;
+        e.preventDefault();
+      }
+    }, { passive:false });
+
+    el.addEventListener('touchmove', function(e){
+      if(!e.touches || e.touches.length === 0) return;
+
+      // Pinch zoom
+      if(e.touches.length >= 2){
+        const a = touchXY(e.touches[0]);
+        const b = touchXY(e.touches[1]);
+        const d = distance(a,b);
+        if(startDist <= 0) startDist = d;
+
+        const scale = d / startDist;
+        let z = clampZoom(startZoom * scale);
+
+        const mid = midpoint(a,b);
+        const rp = relPoint(mid.x, mid.y);
+        const pt = new fabric.Point(rp.x, rp.y);
+        fcv.zoomToPoint(pt, z);
+
+        moved = true;
+        isPinch = true;
+        e.preventDefault();
+        return;
+      }
+
+      // One-finger pan
+      if(e.touches.length === 1){
+        const p = touchXY(e.touches[0]);
+        const dx = p.x - lastX;
+        const dy = p.y - lastY;
+        if(Math.abs(p.x - tapStart.x) > 6 || Math.abs(p.y - tapStart.y) > 6) moved = true;
+
+        panBy(dx, dy);
+
+        lastX = p.x; lastY = p.y;
+        e.preventDefault();
+      }
+    }, { passive:false });
+
+    el.addEventListener('touchend', function(e){
+      try{
+        const remaining = (e.touches && e.touches.length) ? e.touches.length : 0;
+
+        // If pinch ended, reset pinch state when <2 touches
+        if(remaining < 2) isPinch = false;
+
+        // Tap to drop pending landmark (only when not moved and not pinch)
+        if(rrzPendingLandmarkKey && !moved && !isPinch){
+          const t = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0] : null;
+          if(t){
+            const pt = fcv.getPointer(t);
+            addLandmarkAt(rrzPendingLandmarkKey, pt.x, pt.y);
+            rrzClearPendingLandmark();
+            e.preventDefault();
+          }
+        }
+      }catch(err){}
+    }, { passive:false });
+
+    // Prevent page scroll while interacting with canvas in landscape
+    el.addEventListener('touchcancel', function(){ isPinch = false; }, { passive:true });
+  }catch(e){}
+}
+// Enable mobile gestures immediately (safe no-op on desktop)
+try{ rrzEnableMobilePanZoom(canvas); }catch(e){}
+// ===== END RRZ MOBILE TOUCH PATCH =====
+
   // ===== RRZ V18 PATCH: landmark placement gating (prevents computing values for unplaced default-center points) =====
   function rrzPlaced(key){
     const k = rrzCanonKey(key);
@@ -1393,217 +1450,6 @@ Phase 3 (Months 13-18): Finishing and detailing
   let calibrationScale = 1.0; // عامل المقياس الافتراضي
   let calibrationCanvas = null;
   let calibrationPoints = { p1: null, p2: null };
-  // ===== RRZ Mobile UX Patch helpers =====
-  function rrzIsMobile(){
-    try{ return window.matchMedia("(max-width: 920px)").matches; }catch(e){ return window.innerWidth <= 920; }
-  }
-  function rrzIsLandscape(){
-    try{ return window.matchMedia("(orientation: landscape)").matches; }catch(e){ return window.innerWidth > window.innerHeight; }
-  }
-
-  let rrzLandscapeOnReady = null;
-  function rrzShowLandscapeOverlay(){
-    const ov = document.getElementById('rrzLandscapeOverlay');
-    if(!ov) return;
-    ov.style.display = 'flex';
-    ov.setAttribute('aria-hidden', 'false');
-  }
-  function rrzHideLandscapeOverlay(){
-    const ov = document.getElementById('rrzLandscapeOverlay');
-    if(!ov) return;
-    ov.style.display = 'none';
-    ov.setAttribute('aria-hidden', 'true');
-  }
-  function rrzMaybeProceedLandscape(){
-    // Only enforce in analysis mode on mobile
-    const av = document.getElementById('analysis-view');
-    if(!av || av.style.display === 'none') return;
-
-    if(!rrzIsMobile()){
-      rrzHideLandscapeOverlay();
-      if(typeof rrzLandscapeOnReady === 'function'){ const cb = rrzLandscapeOnReady; rrzLandscapeOnReady = null; cb(); }
-      return;
-    }
-    if(rrzIsLandscape()){
-      rrzHideLandscapeOverlay();
-      if(typeof rrzLandscapeOnReady === 'function'){ const cb = rrzLandscapeOnReady; rrzLandscapeOnReady = null; cb(); }
-    } else {
-      rrzShowLandscapeOverlay();
-    }
-  }
-  function rrzRequireLandscapeThen(cb){
-    rrzLandscapeOnReady = cb;
-    rrzMaybeProceedLandscape();
-  }
-  async function rrzTryLockLandscape(){
-    try{
-      if(screen && screen.orientation && screen.orientation.lock){
-        await screen.orientation.lock('landscape');
-      }
-    }catch(e){}
-    setTimeout(rrzMaybeProceedLandscape, 150);
-  }
-  function rrzIHaveRotated(){
-    setTimeout(rrzMaybeProceedLandscape, 50);
-  }
-  window.addEventListener('orientationchange', () => setTimeout(rrzMaybeProceedLandscape, 180));
-  window.addEventListener('resize', () => setTimeout(rrzMaybeProceedLandscape, 220));
-
-  function rrzEnsureCanvasBackground(cv, img, ratio){
-    try{
-      if(!cv || !img) return;
-      // If background is missing (common on some mobile reflow cases), re-apply it safely
-      if(!cv.backgroundImage){
-        const w = (cv.getWidth && cv.getWidth()) ? cv.getWidth() : cv.width;
-        const h = (cv.getHeight && cv.getHeight()) ? cv.getHeight() : cv.height;
-        const bg = new fabric.Image(img, {
-          originX: 'center',
-          originY: 'center',
-          left: (w || 0) / 2,
-          top: (h || 0) / 2,
-          selectable: false,
-          evented: false
-        });
-        bg.scale(ratio || 1);
-        cv.setBackgroundImage(bg, cv.renderAll.bind(cv));
-      }else{
-        // Ensure a render happens after any layout changes
-        try{ cv.requestRenderAll && cv.requestRenderAll(); }catch(_e){}
-      }
-    }catch(e){}
-  }
-
-  function rrzInitCalibrationCanvas(img){
-    try{
-      if(!img) return 1;
-
-      const wrapper = document.querySelector('.calibration-canvas-wrapper');
-      const controls = document.querySelector('.calibration-controls');
-
-      let w = wrapper ? Math.max(10, wrapper.clientWidth) : 0;
-      let h = wrapper ? Math.max(10, wrapper.clientHeight) : 0;
-
-      // If wrapper hasn't been laid out yet (mobile reflow), borrow height from controls
-      if((!h || h < 120) && controls){
-        const ch = controls.getBoundingClientRect ? controls.getBoundingClientRect().height : controls.offsetHeight;
-        if(ch) h = Math.max(h, ch);
-      }
-
-      // Fallbacks
-      if(!w || w < 120) w = Math.max(260, Math.min(window.innerWidth * 0.48, 560));
-      if(!h || h < 120) h = Math.max(260, window.innerHeight - 220);
-
-      const calCanvasEl = document.getElementById('calibrationCanvas');
-      if(!calCanvasEl) return 1;
-
-      // Match the canvas to the wrapper size (this is what makes the image as tall as the list)
-      calCanvasEl.width = Math.floor(w);
-      calCanvasEl.height = Math.floor(h);
-
-      // Re-create fabric canvas to avoid stale internal sizes
-      try{ if(window.calibrationCanvas && window.calibrationCanvas.dispose) window.calibrationCanvas.dispose(); }catch(_e){}
-      try{ if(typeof calibrationCanvas !== 'undefined' && calibrationCanvas && calibrationCanvas.dispose) calibrationCanvas.dispose(); }catch(_e){}
-
-      calibrationCanvas = new fabric.Canvas('calibrationCanvas', { selection: false, width: calCanvasEl.width, height: calCanvasEl.height });
-      window.calibrationCanvas = calibrationCanvas;
-
-      try{ calibrationCanvas.preserveObjectStacking = true; }catch(_e){}
-      try{ calibrationCanvas.allowTouchScrolling = false; }catch(_e){}
-
-      const pad = 0.98;
-      const ratio = Math.min((w * pad) / img.width, (h * pad) / img.height);
-
-      const fabImg = new fabric.Image(img, {
-        originX: 'center',
-        originY: 'center',
-        left: w / 2,
-        top: h / 2,
-        selectable: false,
-        evented: false
-      });
-      fabImg.scale(ratio);
-
-      calibrationCanvas.setBackgroundImage(fabImg, calibrationCanvas.renderAll.bind(calibrationCanvas));
-      window.RRZ_CalibrationRatio = ratio;
-      window.RRZ_ImageRatio = ratio;
-
-      // Gestures support (pinch zoom / pan) if present
-      try{ rrzEnablePinchZoom(calibrationCanvas); }catch(_e){}
-      try{ rrzEnableCalibrationPanZoom(calibrationCanvas); }catch(_e){}
-
-      // Extra delayed render to mitigate blank-canvas on some mobile browsers
-      setTimeout(() => { try{ calibrationCanvas.requestRenderAll(); }catch(_e){} }, 80);
-
-      return ratio;
-    }catch(_e){
-      return 1;
-    }
-  }
-
-  function rrzEnablePinchZoom(cv){
-    try{
-      if(!cv || cv.__rrzPinchEnabled) return;
-      cv.__rrzPinchEnabled = true;
-
-      const el = cv.upperCanvasEl;
-      if(!el) return;
-      try{ el.style.touchAction = 'none'; }catch(e){}
-
-      let pinching = false;
-      let startDist = 0;
-      let startZoom = 1;
-
-      function dist(t1, t2){
-        const dx = t1.clientX - t2.clientX;
-        const dy = t1.clientY - t2.clientY;
-        return Math.sqrt(dx*dx + dy*dy);
-      }
-      function mid(t1, t2){
-        return { x: (t1.clientX + t2.clientX)/2, y: (t1.clientY + t2.clientY)/2 };
-      }
-      function toPoint(clientX, clientY){
-        const r = el.getBoundingClientRect();
-        return new fabric.Point(clientX - r.left, clientY - r.top);
-      }
-
-      el.addEventListener('touchstart', function(ev){
-        if(ev.touches && ev.touches.length === 2){
-          pinching = true;
-          startDist = dist(ev.touches[0], ev.touches[1]) || 1;
-          startZoom = cv.getZoom() || 1;
-          ev.preventDefault();
-          ev.stopPropagation();
-        }
-      }, { passive:false });
-
-      el.addEventListener('touchmove', function(ev){
-        if(!pinching) return;
-        if(ev.touches && ev.touches.length === 2){
-          const d = dist(ev.touches[0], ev.touches[1]) || startDist;
-          let zoom = startZoom * (d / startDist);
-          // keep same limits as wheel zoom
-          zoom = Math.min(Math.max(zoom, 0.25), 6);
-          const m = mid(ev.touches[0], ev.touches[1]);
-          cv.zoomToPoint(toPoint(m.x, m.y), zoom);
-          cv.requestRenderAll();
-          ev.preventDefault();
-          ev.stopPropagation();
-        }
-      }, { passive:false });
-
-      el.addEventListener('touchend', function(ev){
-        if(!ev.touches || ev.touches.length < 2) pinching = false;
-      }, { passive:true });
-
-      el.addEventListener('touchcancel', function(){
-        pinching = false;
-      }, { passive:true });
-
-    }catch(e){}
-  }
-  // ===== END RRZ Mobile UX Patch helpers =====
-
-
   // ===== RRZ PATCH: Calibration canvas pan (drag) + zoom (mouse wheel) =====
   let rrzCal_isPanning = false;
   let rrzCal_lastPosX = 0;
@@ -1955,24 +1801,34 @@ Phase 3 (Months 13-18): Finishing and detailing
         document.getElementById('main-home').style.display = 'none';
         document.getElementById('calibration-view').style.display = 'flex';
         
-        // Initialize calibration canvas (delay to ensure container is visible & sized, especially on mobile)
-        let ratio = 1;
-        const doInitCal = () => {
-          try{
-            ratio = rrzInitCalibrationCanvas(img) || 1;
-          }catch(e){ ratio = 1; }
-          // Keep ratio available (for safety re-apply)
-          window.RRZ_CalibrationRatio = ratio;
-          try{ rrzEnsureCanvasBackground(calibrationCanvas, img, ratio); }catch(_e){}
-        };
-
-        // Give the browser a moment to repaint/reflow after display:flex switch
-        setTimeout(() => { requestAnimationFrame(doInitCal); }, (window.innerWidth <= 900 ? 140 : 60));
-
-        // Store original image for main canvas later
+        // Initialize calibration canvas (fit-to-viewport, avoid over-sizing on mobile)
+        const isMobileLandscapeSplit = window.matchMedia('(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)').matches;
+        const headerH = 85; // calibration header + safe area
+        let availW = window.innerWidth - 40;
+        let availH = window.innerHeight - headerH - 30;
+        if (isMobileLandscapeSplit) {
+          // In landscape mobile we show controls beside the image (similar width to landmarks sidebar)
+          const controlsW = Math.min(360, Math.round(window.innerWidth * 0.38));
+          const gap = 30;
+          availW = window.innerWidth - controlsW - gap - 20;
+          availH = window.innerHeight - headerH - 20;
+        }
+        const ratio = Math.min(1, Math.min(availW / img.width, availH / img.height));
+        const calCanvas = document.getElementById('calibrationCanvas');
+        calCanvas.width = img.width * ratio;
+        calCanvas.height = img.height * ratio;
+        
+        calibrationCanvas = new fabric.Canvas('calibrationCanvas', { selection: false });
+        const fabImg = new fabric.Image(img);
+        fabImg.scale(ratio);
+        calibrationCanvas.setBackgroundImage(fabImg, calibrationCanvas.renderAll.bind(calibrationCanvas));
+        
+        
+        try{ rrzEnableCalibrationPanZoom(calibrationCanvas); }catch(e){}
+// Store original image for main canvas later
         window.RRZ_OriginalImage = img;
         window.RRZ_ImageRatio = ratio;
-
+        
         // Reset calibration data
         calibrationScale = 1.0;
         calibrationPoints = { p1: null, p2: null };
@@ -1986,10 +1842,8 @@ Phase 3 (Months 13-18): Finishing and detailing
   // ===== NEW: CALIBRATION FUNCTIONS =====
   function manualCalibration() {
     if (!calibrationCanvas) return;
-    // Safety: ensure background image never disappears on mobile taps
-    try{ rrzEnsureCanvasBackground(calibrationCanvas, window.RRZ_OriginalImage, window.RRZ_CalibrationRatio || window.RRZ_ImageRatio); }catch(e){}
     
-isCalibrationMode = true;
+    isCalibrationMode = true;
     
     // Clear previous points
     if (calibrationPoints.p1) calibrationCanvas.remove(calibrationPoints.p1);
@@ -2129,52 +1983,27 @@ isCalibrationMode = true;
     document.getElementById('calibration-view').style.display = 'none';
     document.getElementById('analysis-view').style.display = 'flex';
     document.getElementById('lmSidebar').style.display = 'block';
-
-    const startAnalysis = () => {
-      // Initialize main canvas with the original image (fit to current viewport)
-      const img = window.RRZ_OriginalImage;
-      if(!img) return;
-
-      const wrap = document.getElementById('canvas-container-wrapper');
-      const r = wrap ? wrap.getBoundingClientRect() : { width: window.innerWidth, height: window.innerHeight };
-
-      const availW = Math.max(50, r.width || window.innerWidth);
-      const availH = Math.max(50, r.height || (window.innerHeight - 180));
-
-      const ratio = Math.min(availW / img.width, availH / img.height);
-      window.RRZ_ImageRatio = ratio;
-
-      canvas.setDimensions({
-        width: img.width * ratio,
-        height: img.height * ratio
-      });
-
-      const fabImg = new fabric.Image(img);
-      fabImg.scale(ratio);
-      canvas.setBackgroundImage(fabImg, canvas.renderAll.bind(canvas));
-
-      try{ canvas.preserveObjectStacking = true; }catch(e){}
-      try{ canvas.allowTouchScrolling = false; }catch(e){}
-      try{ rrzEnablePinchZoom(canvas); }catch(e){}
-      try{ rrzEnsureCanvasBackground(canvas, img, ratio); }catch(e){}
-
-      // Initialize point metadata
-      pointSettings.forEach(p => {
-        const shortLbl = makeShortLabel(p.id, p.key);
-        pointMeta[p.key] = { full: p.id, short: shortLbl, color: p.c };
-        cephPoints[p.key] = null;
-        labelObjects[p.key] = null;
-      });
-
-      buildLandmarkSidebar();
-    };
-
-    // After calibration: enforce Landscape on mobile before starting point placement
-    if (rrzIsMobile() && !rrzIsLandscape()) {
-      rrzRequireLandscapeThen(startAnalysis);
-    } else {
-    setTimeout(startAnalysis, (window.innerWidth <= 900 ? 120 : 40));
-    }
+    
+    // Initialize main canvas with original image
+    const ratio = window.RRZ_ImageRatio;
+    canvas.setDimensions({ 
+      width: window.RRZ_OriginalImage.width * ratio, 
+      height: window.RRZ_OriginalImage.height * ratio 
+    });
+    
+    const fabImg = new fabric.Image(window.RRZ_OriginalImage);
+    fabImg.scale(ratio);
+    canvas.setBackgroundImage(fabImg, canvas.renderAll.bind(canvas));
+    
+    // Initialize point metadata
+    pointSettings.forEach(p => {
+      const shortLbl = makeShortLabel(p.id, p.key);
+      pointMeta[p.key] = { full: p.id, short: shortLbl, color: p.c };
+      cephPoints[p.key] = null;
+      labelObjects[p.key] = null;
+    });
+    
+    buildLandmarkSidebar();
   }
 
   // ===== END CALIBRATION FUNCTIONS =====
@@ -5574,22 +5403,6 @@ ${phase.tasks.map(task => `- ${task}`).join('\n')}`
       setTimeout(() => {
           try { rrzApplyPatientNameToUI(); } catch(e) {}
       }, 100);
-
-      // Mobile-safe upload trigger (Safari/iOS blocks label->input when input is display:none)
-      try{
-        const u = document.getElementById('imgLoader');
-        const b = document.getElementById('btnUploadCeph');
-        if(u && b){
-          const trigger = (ev) => { try{ ev && ev.preventDefault && ev.preventDefault(); }catch(_e){} try{ u.click(); }catch(_e){} };
-          b.addEventListener('click', trigger);
-          b.addEventListener('touchstart', trigger, { passive: false });
-          b.addEventListener('keydown', (ev) => {
-            if(ev.key === 'Enter' || ev.key === ' '){
-              trigger(ev);
-            }
-          });
-        }
-      }catch(e){}
   });
 
   // ===== Reference Cephalometric Image =====
