@@ -52,17 +52,9 @@
       justify-content: center; align-items: center; flex-wrap: wrap;
     }
     .calibration-canvas-wrapper { 
-      position: relative;
-      border: 2px solid var(--gold);
-      border-radius: 10px;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #000;
+      position: relative; border: 2px solid var(--gold); 
+      border-radius: 10px; overflow: hidden; 
     }
-    /* Ensure canvases are centered (important in RTL where inline canvases may align right) */
-    canvas{ display:block; margin:0 auto; touch-action: none; }
     .calibration-controls { 
       background: rgba(15,23,42,0.9); padding: 20px; border-radius: 15px; 
       min-width: 300px; max-width: 400px; border: 1px solid rgba(197,160,89,0.3);
@@ -137,77 +129,6 @@
     .action-btn { padding: 14px 28px; border-radius: 50px; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; text-transform: uppercase; }
     
     @media (max-width: 768px) { .board-grid { grid-template-columns: 1fr; } .report-card { width: 95%; } }
-
-    /* === RRZ MOBILE LANDSCAPE PATCH: show image beside landmark list + touch pan/zoom === */
-#analysis-workspace{
-  flex: 1;
-  position: relative;
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  overflow: hidden;
-  background: #000;
-}
-#analysis-workspace #canvas-container-wrapper{
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
-  background: #000;
-}
-
-/* Mobile landscape: split view (Landmarks list beside image) */
-@media (orientation: landscape) and (max-width: 1024px) and (pointer: coarse) {
-  #analysis-workspace{
-    flex-direction: row-reverse; /* RTL-friendly: list on the right */
-  }
-  #analysis-workspace .lm-sidebar{
-    position: relative !important;
-    top: auto !important;
-    left: auto !important;
-    right: auto !important;
-    width: min(360px, 38vw);
-    height: calc(100vh - 88px); /* header safe space */
-    max-height: none;
-    margin: 10px;
-    z-index: 80;
-  }
-  #analysis-workspace #canvas-container-wrapper{
-    flex: 1;
-  }
-  /* keep zoom controls reachable */
-  .zoom-controls{
-    top: 78px;
-    right: 10px;
-  }
-}
-
-/* Mobile landscape: also keep Calibration view compact + centered (avoid huge empty panel) */
-@media (orientation: landscape) and (max-width: 1024px) and (pointer: coarse) {
-  #calibration-view{ justify-content: flex-start; }
-  .calibration-container{
-    flex-wrap: nowrap;
-    width: 100%;
-    height: calc(100vh - 70px);
-    padding: 10px;
-    gap: 10px;
-    align-items: stretch;
-  }
-  .calibration-canvas-wrapper{
-    flex: 1;
-    min-width: 0;
-    max-height: 100%;
-  }
-  #calibrationCanvas{ max-width: 100%; max-height: 100%; }
-  .calibration-controls{
-    width: min(360px, 38vw);
-    min-width: 0;
-    max-width: none;
-    max-height: 100%;
-    overflow: auto;
-  }
-}
 
     /* === RRZ Add-on: Landmark sidebar + Report pages === */
     .lm-sidebar{
@@ -306,7 +227,46 @@
     .zoom-btn:hover { background: var(--gold); color: #0b1220; }
     .zoom-btn.active { background: var(--success); color: white; border-color: var(--success); }
 
-    /* === RRZ V4: Header actions (Generate + Final) === */
+    
+
+/* === RRZ Mobile UX Patch (V1): better mobile sizing + move floating controls to the left === */
+@media (max-width: 900px) {
+  /* keep the canvas centered (RTL-safe) */
+  #canvas-container-wrapper canvas,
+  .calibration-canvas-wrapper canvas{
+    display:block;
+    margin: 0 auto;
+  }
+  /* move zoom/pan buttons away from the landmarks list */
+  .zoom-controls{ right:auto; left: 12px; top: 86px; }
+}
+
+/* Mobile Calibration Layout */
+@media (max-width: 900px) and (orientation: portrait){
+  .calibration-container{ flex-direction: column; gap: 12px; padding: 12px; align-items: center; }
+  .calibration-canvas-wrapper{ width: calc(100vw - 24px); max-width: 720px; }
+  .calibration-controls{ width: calc(100vw - 24px); max-width: 720px; min-width: 0; }
+}
+@media (max-width: 900px) and (orientation: landscape){
+  .calibration-container{ flex-direction: row-reverse; flex-wrap: nowrap; gap: 12px; padding: 12px; align-items: stretch; }
+  .calibration-canvas-wrapper{ flex: 1 1 auto; min-width: 0; }
+  .calibration-controls{ flex: 0 0 min(42vw, 360px); min-width: 0; max-width: 420px; height: auto; }
+}
+
+/* Mobile Analysis Split View (Landscape): image beside landmark list */
+@media (max-width: 900px) and (orientation: landscape){
+  #rrzAnalysisSplit{ display:flex; flex:1; min-height:0; gap: 10px; padding: 10px; flex-direction: row-reverse; }
+  #rrzAnalysisSplit #canvas-container-wrapper{
+    flex: 1 1 auto; min-width: 0; border: 1px solid rgba(197,160,89,0.35);
+    border-radius: 14px; overflow: hidden;
+  }
+  #rrzAnalysisSplit .lm-sidebar{
+    position: relative; top: auto; left: auto; transform: none;
+    width: min(42vw, 360px); max-height: none; height: 100%;
+    margin: 0; border-radius: 14px;
+  }
+}
+/* === RRZ V4: Header actions (Generate + Final) === */
     .rrzHeaderActions{
       display:flex;
       gap:10px;
@@ -698,18 +658,12 @@
     <button class="zoom-btn" onclick="resetZoom()" title="Reset Zoom">⟲</button>
   </div>
 
-  
-  <div id="analysis-workspace">
   <div id="canvas-container-wrapper"><canvas id="mainCanvas"></canvas></div>
-  <div class="lm-sidebar" id="lmSidebar" style="display:none;">
-    <h4>Landmarks</h4>
-    <div id="lmList"></div>
+  <div class="lm-sidebar" id="lmSidebar" style="display:none;"><h4>Landmarks</h4><div id="lmList"></div>
     <button id="btnCephRefSidebar" class="lm-ref-btn no-print" onclick="openCephReference()" style="width:100%; margin-top:10px; padding:10px 12px; border-radius:12px; border:1px solid rgba(197,160,89,0.55); background:linear-gradient(90deg, rgba(52,152,219,0.20), rgba(197,160,89,0.25)); color:#fff; font-weight:900; letter-spacing:.3px; cursor:pointer;">REFERENCE CEPHALOMETRIC IMAGE</button>
-  </div>
 </div>
 
-<div class="floating-footer"
- style="display:none;">
+  <div class="floating-footer" style="display:none;">
     <button onclick="generateAnalysis()" class="action-btn" style="background:var(--gold); color:white; min-width: 250px; box-shadow: 0 10px 20px rgba(0,0,0,0.4);">Generate Report 📐</button>
   </div>
 </div>
@@ -1302,137 +1256,6 @@ Phase 3 (Months 13-18): Finishing and detailing
   }
   // ===== END RRZ V23 PATCH =====
 
-// ===== RRZ MOBILE TOUCH PATCH: One-finger pan + two-finger pinch zoom (mobile) =====
-function rrzEnableMobilePanZoom(fcv){
-  try{
-    if(!fcv || fcv.__rrzMobilePanZoomEnabled) return;
-    fcv.__rrzMobilePanZoomEnabled = true;
-
-    const el = fcv.upperCanvasEl || fcv.lowerCanvasEl;
-    if(!el) return;
-
-    const isCoarse = (() => {
-      try{ return window.matchMedia && window.matchMedia('(pointer: coarse)').matches; }catch(e){ return false; }
-    })();
-    if(!isCoarse) return; // only for touch-first devices
-
-    let lastX = 0, lastY = 0;
-    let startZoom = 1, startDist = 0;
-    let isPinch = false;
-    let moved = false;
-    let tapStart = { x:0, y:0, t:0 };
-
-    function touchXY(t){
-      return { x: t.clientX, y: t.clientY };
-    }
-    function distance(a,b){
-      const dx = a.x - b.x, dy = a.y - b.y;
-      return Math.hypot(dx, dy);
-    }
-    function midpoint(a,b){
-      return { x:(a.x+b.x)/2, y:(a.y+b.y)/2 };
-    }
-    function relPoint(clientX, clientY){
-      const r = el.getBoundingClientRect();
-      return { x: clientX - r.left, y: clientY - r.top };
-    }
-    function panBy(dx, dy){
-      const vpt = fcv.viewportTransform;
-      vpt[4] += dx;
-      vpt[5] += dy;
-      fcv.requestRenderAll();
-    }
-    function clampZoom(z){
-      return Math.min(Math.max(z, 0.25), 6);
-    }
-
-    el.addEventListener('touchstart', function(e){
-      if(!e.touches || e.touches.length === 0) return;
-
-      moved = false;
-
-      if(e.touches.length === 1){
-        const p = touchXY(e.touches[0]);
-        lastX = p.x; lastY = p.y;
-        tapStart = { x:p.x, y:p.y, t: Date.now() };
-        isPinch = false;
-        // allow tap to place pending landmark on touchend
-      } else if(e.touches.length >= 2){
-        const a = touchXY(e.touches[0]);
-        const b = touchXY(e.touches[1]);
-        startDist = distance(a,b);
-        startZoom = fcv.getZoom();
-        isPinch = true;
-        e.preventDefault();
-      }
-    }, { passive:false });
-
-    el.addEventListener('touchmove', function(e){
-      if(!e.touches || e.touches.length === 0) return;
-
-      // Pinch zoom
-      if(e.touches.length >= 2){
-        const a = touchXY(e.touches[0]);
-        const b = touchXY(e.touches[1]);
-        const d = distance(a,b);
-        if(startDist <= 0) startDist = d;
-
-        const scale = d / startDist;
-        let z = clampZoom(startZoom * scale);
-
-        const mid = midpoint(a,b);
-        const rp = relPoint(mid.x, mid.y);
-        const pt = new fabric.Point(rp.x, rp.y);
-        fcv.zoomToPoint(pt, z);
-
-        moved = true;
-        isPinch = true;
-        e.preventDefault();
-        return;
-      }
-
-      // One-finger pan
-      if(e.touches.length === 1){
-        const p = touchXY(e.touches[0]);
-        const dx = p.x - lastX;
-        const dy = p.y - lastY;
-        if(Math.abs(p.x - tapStart.x) > 6 || Math.abs(p.y - tapStart.y) > 6) moved = true;
-
-        panBy(dx, dy);
-
-        lastX = p.x; lastY = p.y;
-        e.preventDefault();
-      }
-    }, { passive:false });
-
-    el.addEventListener('touchend', function(e){
-      try{
-        const remaining = (e.touches && e.touches.length) ? e.touches.length : 0;
-
-        // If pinch ended, reset pinch state when <2 touches
-        if(remaining < 2) isPinch = false;
-
-        // Tap to drop pending landmark (only when not moved and not pinch)
-        if(rrzPendingLandmarkKey && !moved && !isPinch){
-          const t = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0] : null;
-          if(t){
-            const pt = fcv.getPointer(t);
-            addLandmarkAt(rrzPendingLandmarkKey, pt.x, pt.y);
-            rrzClearPendingLandmark();
-            e.preventDefault();
-          }
-        }
-      }catch(err){}
-    }, { passive:false });
-
-    // Prevent page scroll while interacting with canvas in landscape
-    el.addEventListener('touchcancel', function(){ isPinch = false; }, { passive:true });
-  }catch(e){}
-}
-// Enable mobile gestures immediately (safe no-op on desktop)
-try{ rrzEnableMobilePanZoom(canvas); }catch(e){}
-// ===== END RRZ MOBILE TOUCH PATCH =====
-
   // ===== RRZ V18 PATCH: landmark placement gating (prevents computing values for unplaced default-center points) =====
   function rrzPlaced(key){
     const k = rrzCanonKey(key);
@@ -1790,6 +1613,58 @@ try{ rrzEnableMobilePanZoom(canvas); }catch(e){}
 
 
 
+  // ===== RRZ Mobile Fit Helpers (keeps calibration scale consistent) =====
+function rrzIsMobile(){
+  try{ return window.matchMedia && window.matchMedia('(pointer: coarse)').matches; }catch(e){ return false; }
+}
+function rrzIsLandscape(){
+  try{ return window.matchMedia && window.matchMedia('(orientation: landscape)').matches; }catch(e){ return (window.innerWidth > window.innerHeight); }
+}
+function rrzComputeFitScale(imgW, imgH, availW, availH){
+  const s = Math.min(availW / imgW, availH / imgH);
+  // allow a *little* upscale for small images, but avoid insane zoom
+  return Math.max(0.05, Math.min(s, 2.0));
+}
+function rrzGetCalibrationAvail(){
+  const headerH = 62;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  if(rrzIsMobile() && rrzIsLandscape() && vw <= 900){
+    // side-by-side (canvas + controls)
+    return { w: Math.floor(vw * 0.56), h: Math.floor(vh - headerH - 16) };
+  }
+  // portrait / tablets: canvas on top
+  return { w: Math.floor(vw - 24), h: Math.floor(vh * 0.52) };
+}
+function rrzGetAnalysisAvail(){
+  const headerH = 72;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  if(rrzIsMobile() && rrzIsLandscape() && vw <= 900){
+    // leave room for the landmark list on the right
+    return { w: Math.floor(vw * 0.58), h: Math.floor(vh - headerH - 20) };
+  }
+
+
+function rrzInitAnalysisSplit(){
+  const av = document.getElementById('analysis-view');
+  const cw = document.getElementById('canvas-container-wrapper');
+  const sb = document.getElementById('lmSidebar');
+  if(!av || !cw || !sb) return;
+  if(document.getElementById('rrzAnalysisSplit')) return;
+
+  const split = document.createElement('div');
+  split.id = 'rrzAnalysisSplit';
+  split.style.flex = '1';
+  split.style.minHeight = '0';
+  split.style.position = 'relative';
+
+  av.insertBefore(split, cw);
+  split.appendChild(cw);
+  split.appendChild(sb);
+}
+  // portrait: take most of the height, list can float/overlay
+  return { w: Math.floor(vw - 24), h: Math.floor(vh - headerH - 20) };
+}
+
   // ===== IMAGE UPLOAD - MODIFIED FOR CALIBRATION =====
   document.getElementById('imgLoader').onchange = function(e) {
     const reader = new FileReader();
@@ -1801,30 +1676,22 @@ try{ rrzEnableMobilePanZoom(canvas); }catch(e){}
         document.getElementById('main-home').style.display = 'none';
         document.getElementById('calibration-view').style.display = 'flex';
         
-        // Initialize calibration canvas (fit-to-viewport, avoid over-sizing on mobile)
-        const isMobileLandscapeSplit = window.matchMedia('(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)').matches;
-        const headerH = 85; // calibration header + safe area
-        let availW = window.innerWidth - 40;
-        let availH = window.innerHeight - headerH - 30;
-        if (isMobileLandscapeSplit) {
-          // In landscape mobile we show controls beside the image (similar width to landmarks sidebar)
-          const controlsW = Math.min(360, Math.round(window.innerWidth * 0.38));
-          const gap = 30;
-          availW = window.innerWidth - controlsW - gap - 20;
-          availH = window.innerHeight - headerH - 20;
-        }
-        const ratio = Math.min(1, Math.min(availW / img.width, availH / img.height));
-        const calCanvas = document.getElementById('calibrationCanvas');
-        calCanvas.width = img.width * ratio;
-        calCanvas.height = img.height * ratio;
         
-        calibrationCanvas = new fabric.Canvas('calibrationCanvas', { selection: false });
-        const fabImg = new fabric.Image(img);
-        fabImg.scale(ratio);
-        calibrationCanvas.setBackgroundImage(fabImg, calibrationCanvas.renderAll.bind(calibrationCanvas));
-        
-        
-        try{ rrzEnableCalibrationPanZoom(calibrationCanvas); }catch(e){}
+// Initialize calibration canvas (mobile-friendly)
+const calAvail = rrzGetCalibrationAvail();
+const ratio = rrzComputeFitScale(img.width, img.height, calAvail.w, calAvail.h);
+
+const calCanvas = document.getElementById('calibrationCanvas');
+calCanvas.width  = Math.round(img.width * ratio);
+calCanvas.height = Math.round(img.height * ratio);
+
+calibrationCanvas = new fabric.Canvas('calibrationCanvas', { selection: false });
+const fabImg = new fabric.Image(img);
+fabImg.scale(ratio);
+calibrationCanvas.setBackgroundImage(fabImg, calibrationCanvas.renderAll.bind(calibrationCanvas));
+
+// Track display scale used during calibration (so we can keep measurement units consistent later)
+window.RRZ_CalibDisplayScale = ratio;try{ rrzEnableCalibrationPanZoom(calibrationCanvas); }catch(e){}
 // Store original image for main canvas later
         window.RRZ_OriginalImage = img;
         window.RRZ_ImageRatio = ratio;
@@ -1982,20 +1849,33 @@ try{ rrzEnableMobilePanZoom(canvas); }catch(e){}
     // Hide calibration and show analysis view
     document.getElementById('calibration-view').style.display = 'none';
     document.getElementById('analysis-view').style.display = 'flex';
+    try { rrzInitAnalysisSplit(); } catch(e) {}
+
     document.getElementById('lmSidebar').style.display = 'block';
     
-    // Initialize main canvas with original image
-    const ratio = window.RRZ_ImageRatio;
-    canvas.setDimensions({ 
-      width: window.RRZ_OriginalImage.width * ratio, 
-      height: window.RRZ_OriginalImage.height * ratio 
-    });
     
-    const fabImg = new fabric.Image(window.RRZ_OriginalImage);
-    fabImg.scale(ratio);
-    canvas.setBackgroundImage(fabImg, canvas.renderAll.bind(canvas));
-    
-    // Initialize point metadata
+// Initialize main canvas with original image (fit to current viewport)
+const img = window.RRZ_OriginalImage;
+const anAvail = rrzGetAnalysisAvail();
+const newRatio = rrzComputeFitScale(img.width, img.height, anAvail.w, anAvail.h);
+
+// Keep mm/px consistent if the display scale changed after calibration
+const oldRatio = (typeof window.RRZ_CalibDisplayScale === 'number' && window.RRZ_CalibDisplayScale > 0) ? window.RRZ_CalibDisplayScale : (window.RRZ_ImageRatio || newRatio);
+if (oldRatio && newRatio && oldRatio !== newRatio) {
+  // scale_new = scale_old * (oldRatio / newRatio)
+  calibrationScale = calibrationScale * (oldRatio / newRatio);
+}
+window.RRZ_ImageRatio = newRatio;
+window.RRZ_DisplayScale = newRatio;
+
+canvas.setDimensions({
+  width: Math.round(img.width * newRatio),
+  height: Math.round(img.height * newRatio)
+});
+
+const fabImg = new fabric.Image(img);
+fabImg.scale(newRatio);
+canvas.setBackgroundImage(fabImg, canvas.renderAll.bind(canvas));// Initialize point metadata
     pointSettings.forEach(p => {
       const shortLbl = makeShortLabel(p.id, p.key);
       pointMeta[p.key] = { full: p.id, short: shortLbl, color: p.c };
@@ -5403,6 +5283,8 @@ ${phase.tasks.map(task => `- ${task}`).join('\n')}`
       setTimeout(() => {
           try { rrzApplyPatientNameToUI(); } catch(e) {}
       }, 100);
+      // Mobile UX: build analysis split wrapper (canvas + landmarks) for landscape side-by-side
+      try { rrzInitAnalysisSplit(); } catch(e) {}
   });
 
   // ===== Reference Cephalometric Image =====
