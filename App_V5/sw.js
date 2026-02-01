@@ -2,7 +2,7 @@
 هدفه: منع تعارض الـ SW (sw.js vs service-worker.js) + تثبيت Offline/Cache بدون فشل install.
 ملاحظة: لا يَكِش ملفات كبيرة/ديناميكية (PDF runtime, blobs) بشكل مقصود.
 */
-// تم تحديث الإصدار إلى 1.12 لضمان تحميل التعديلات الجديدة في voice-report.html
+// تم تحديث الإصدار إلى 1.14 لضمان تحميل التعديلات الجديدة في ceph.html
 const CACHE_VERSION = 'rrz-unified-v1.14';
 const CORE = [
 './',
