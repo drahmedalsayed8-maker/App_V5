@@ -1321,19 +1321,23 @@ Phase 3 (Months 13-18): Finishing and detailing
       cv.discardActiveObject();
       cv.selection = false;
       cv.defaultCursor = 'grabbing';
-      rrzCal_lastPosX = e.clientX;
-      rrzCal_lastPosY = e.clientY;
+      const pt = rrzEvtXY(e);
+      rrzCal_lastPosX = pt.x;
+      rrzCal_lastPosY = pt.y;
     });
 
     cv.on('mouse:move', function(opt){
       if(!rrzCal_isPanning) return;
       const e = opt.e;
       const vpt = cv.viewportTransform;
-      vpt[4] += (e.clientX - rrzCal_lastPosX);
-      vpt[5] += (e.clientY - rrzCal_lastPosY);
+      const pt = rrzEvtXY(e);
+      const d = rrzSafeDelta(pt, {x:rrzCal_lastPosX,y:rrzCal_lastPosY});
+      if(!d.ok) return;
+      vpt[4] += d.dx;
+      vpt[5] += d.dy;
       cv.requestRenderAll();
-      rrzCal_lastPosX = e.clientX;
-      rrzCal_lastPosY = e.clientY;
+      rrzCal_lastPosX = pt.x;
+      rrzCal_lastPosY = pt.y;
     });
 
     function endPan(){
@@ -1355,6 +1359,24 @@ Phase 3 (Months 13-18): Finishing and detailing
   // ==========================================
 
   // ===== ZOOM & PAN LOGIC =====
+  // Helper: normalize mouse/touch coordinates (prevents NaN viewportTransform on mobile)
+  function rrzEvtXY(e){
+    try{
+      if(!e) return {x:0,y:0};
+      if(e.touches && e.touches.length){ return {x:e.touches[0].clientX, y:e.touches[0].clientY}; }
+      if(e.changedTouches && e.changedTouches.length){ return {x:e.changedTouches[0].clientX, y:e.changedTouches[0].clientY}; }
+      const x = (typeof e.clientX === 'number') ? e.clientX : 0;
+      const y = (typeof e.clientY === 'number') ? e.clientY : 0;
+      return {x,y};
+    }catch(err){ return {x:0,y:0}; }
+  }
+  function rrzSafeDelta(curr, last){
+    const dx = curr.x - last.x;
+    const dy = curr.y - last.y;
+    if(!Number.isFinite(dx) || !Number.isFinite(dy)) return {dx:0,dy:0,ok:false};
+    return {dx,dy,ok:true};
+  }
+
   let isPanning = false;
   function zoomIn() {
     let zoom = canvas.getZoom();
@@ -1393,19 +1415,23 @@ Phase 3 (Months 13-18): Finishing and detailing
     if (isPanning) {
       isDragging = true;
       selection = false;
-      lastPosX = evt.clientX;
-      lastPosY = evt.clientY;
+      const pt = rrzEvtXY(evt);
+      lastPosX = pt.x;
+      lastPosY = pt.y;
     }
   });
   canvas.on('mouse:move', function(opt) {
     if (isPanning && isDragging) {
       var e = opt.e;
       var vpt = this.viewportTransform;
-      vpt[4] += e.clientX - lastPosX;
-      vpt[5] += e.clientY - lastPosY;
+      const pt = rrzEvtXY(e);
+      const d = rrzSafeDelta(pt, {x:lastPosX,y:lastPosY});
+      if(!d.ok) return;
+      vpt[4] += d.dx;
+      vpt[5] += d.dy;
       this.requestRenderAll();
-      lastPosX = e.clientX;
-      lastPosY = e.clientY;
+      lastPosX = pt.x;
+      lastPosY = pt.y;
     }
   });
   canvas.on('mouse:up', function(opt) {
@@ -1456,8 +1482,9 @@ Phase 3 (Months 13-18): Finishing and detailing
     // 2) Otherwise, start panning ONLY if user clicks on empty canvas (not on objects).
     if(!opt.target && e.button === 0){
       rrzDragPanning = true;
-      rrzLastPosX = e.clientX;
-      rrzLastPosY = e.clientY;
+      const pt = rrzEvtXY(e);
+      rrzLastPosX = pt.x;
+      rrzLastPosY = pt.y;
       canvas.defaultCursor = 'grabbing';
     }
   });
@@ -1469,8 +1496,9 @@ Phase 3 (Months 13-18): Finishing and detailing
       vpt[4] += e.clientX - rrzLastPosX;
       vpt[5] += e.clientY - rrzLastPosY;
       canvas.requestRenderAll();
-      rrzLastPosX = e.clientX;
-      rrzLastPosY = e.clientY;
+      const pt = rrzEvtXY(e);
+      rrzLastPosX = pt.x;
+      rrzLastPosY = pt.y;
     }
   });
 
